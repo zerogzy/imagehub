@@ -49,6 +49,9 @@ model MediaAsset {
   @@index([status])
   @@index([createdAt])
   @@index([sha256])
+  @@index([phash])
+  @@index([dhash])
+  @@index([status, mediaType, createdAt])
   @@map("media_assets")
 }
 
