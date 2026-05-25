@@ -9,7 +9,6 @@ permissions:
   contents: write
 
 env:
-  NODE_ENV: production
   DATABASE_URL: mysql://imagehub:imagehub@127.0.0.1:3306/imagehub
 
 jobs:
