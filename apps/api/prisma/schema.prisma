@@ -1,0 +1,352 @@
+// ============================================================
+// ImageHub Database Schema
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Media Assets ----
+model MediaAsset {
+  id                String              @id @default(uuid())
+  originalFilename  String              @map("original_filename")
+  displayFilename   String?             @map("display_filename")
+  storageKey        String              @unique @map("storage_key")
+  mimeType          String              @map("mime_type")
+  mediaType         String              @map("media_type") // image, gif, video, audio
+  width             Int?
+  height            Int?
+  duration          Float?              // seconds, for video/audio
+  sizeBytes         BigInt              @map("size_bytes")
+  sha256            String?             @unique
+  phash             String?
+  dhash             String?
+  qualityScore      Int?                @map("quality_score") // 0-100
+  status            String              @default("processing") // processing, ready, failed, trashed
+  deletedAt         DateTime?           @map("deleted_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  derivatives       AssetDerivative[]
+  groupAssets       GroupAsset[]
+  assetTags         AssetTag[]
+  downloadShares    DownloadShare[]
+  downloadTokens    DownloadToken[]
+  accessEvents      AccessEvent[]
+  statsDaily        AssetStatsDaily[]
+  similarityA       SimilarityCandidate[] @relation("SimilarityA")
+  similarityB       SimilarityCandidate[] @relation("SimilarityB")
+  trashItem         TrashItem?
+
+
+  @@index([mediaType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([sha256])
+  @@map("media_assets")
+}
+
+// ---- Asset Derivatives (thumbnails, previews, etc.) ----
+model AssetDerivative {
+  id              String      @id @default(uuid())
+  assetId         String      @map("asset_id")
+  derivativeType  String      @map("derivative_type") // thumb, preview, large, video_cover, audio_cover, waveform
+  storageKey      String      @map("storage_key")
+  width           Int?
+  height          Int?
+  sizeBytes       BigInt?     @map("size_bytes")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  asset           MediaAsset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, derivativeType])
+  @@index([assetId])
+  @@map("asset_derivatives")
+}
+
+// ---- Groups ----
+model Group {
+  id                    String        @id @default(uuid())
+  name                  String
+  slug                  String        @unique
+  description           String?
+  rankKey               String        @default("") @map("rank_key")
+  randomEnabled         Boolean       @default(false) @map("random_enabled")
+  randomRotateInterval  Int?          @map("random_rotate_interval") // minutes
+  currentSeed           String?       @map("current_seed")
+  lastSeedRotatedAt     DateTime?     @map("last_seed_rotated_at")
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  subgroups             Subgroup[]
+  groupAssets           GroupAsset[]
+
+  @@index([rankKey])
+  @@map("groups")
+}
+
+// ---- Subgroups ----
+model Subgroup {
+  id          String      @id @default(uuid())
+  groupId     String      @map("group_id")
+  name        String
+  description String?
+  rankKey     String      @default("") @map("rank_key")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  group       Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupAssets GroupAsset[]
+
+  @@index([groupId])
+  @@index([rankKey])
+  @@map("subgroups")
+}
+
+// ---- Group-Asset Relationship ----
+model GroupAsset {
+  id          String      @id @default(uuid())
+  groupId     String      @map("group_id")
+  subgroupId  String?     @map("subgroup_id")
+  assetId     String      @map("asset_id")
+  rankKey     String      @default("") @map("rank_key")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  group       Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  subgroup    Subgroup?   @relation(fields: [subgroupId], references: [id], onDelete: SetNull)
+  asset       MediaAsset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, assetId])
+  @@index([groupId])
+  @@index([subgroupId])
+  @@index([assetId])
+  @@index([rankKey])
+  @@map("group_assets")
+}
+
+// ---- Tags ----
+model Tag {
+  id              String      @id @default(uuid())
+  name            String      @unique
+  normalizedName  String      @unique @map("normalized_name")
+  aliasesJson     String?     @default("[]") @map("aliases_json") // JSON array of alias strings
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  assetTags       AssetTag[]
+
+  @@map("tags")
+}
+
+// ---- Asset-Tag Relationship ----
+model AssetTag {
+  id          String      @id @default(uuid())
+  assetId     String      @map("asset_id")
+  tagId       String      @map("tag_id")
+  source      String      @default("admin") // admin, batch, import, system_suggested
+  confidence  Float?      // for system_suggested
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  asset       MediaAsset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, tagId])
+  @@index([assetId])
+  @@index([tagId])
+  @@map("asset_tags")
+}
+
+// ---- Access Tokens ----
+model AccessToken {
+  id                String       @id @default(uuid())
+  name              String
+  tokenHash         String       @unique @map("token_hash")
+  tokenPrefix       String       @map("token_prefix") // first 8 chars for identification
+  role              String       @default("visitor") // visitor, admin
+  enabled           Boolean      @default(true)
+  rotatedFromTokenId String?     @map("rotated_from_token_id")
+  expiresAt         DateTime?    @map("expires_at")
+  lastUsedAt        DateTime?    @map("last_used_at")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  // Audit logs and download tokens reference this
+  auditLogs         AuditLog[]
+  batchJobs         BatchJob[]          @relation("JobCreatedBy")
+  downloadTokens    DownloadToken[]
+  trashItems        TrashItem[]
+  downloadShares    DownloadShare[]
+
+  @@index([tokenHash])
+  @@index([role])
+  @@map("access_tokens")
+}
+
+// ---- Download Shares (permanent links) ----
+model DownloadShare {
+  id                String       @id @default(uuid())
+  assetId           String       @map("asset_id")
+  shareId           String       @unique @map("share_id")
+  createdByTokenId  String       @map("created_by_token_id")
+  enabled           Boolean      @default(true)
+  permanent         Boolean      @default(true)
+  expiresAt         DateTime?    @map("expires_at")
+  downloadCount     Int          @default(0) @map("download_count")
+  lastAccessedAt    DateTime?    @map("last_accessed_at")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  revokedAt         DateTime?    @map("revoked_at")
+
+  asset             MediaAsset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdByToken    AccessToken  @relation(fields: [createdByTokenId], references: [id])
+
+  @@index([assetId])
+  @@index([shareId])
+  @@map("download_shares")
+}
+
+// ---- Download Tokens (short-lived) ----
+model DownloadToken {
+  id                String       @id @default(uuid())
+  assetId           String       @map("asset_id")
+  tokenHash         String       @unique @map("token_hash")
+  downloadType      String       @map("download_type") // temp_single, temp_batch
+  expiresAt         DateTime     @map("expires_at")
+  usedAt            DateTime?    @map("used_at")
+  createdByTokenId  String       @map("created_by_token_id")
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  asset             MediaAsset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdByToken    AccessToken  @relation(fields: [createdByTokenId], references: [id])
+
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("download_tokens")
+}
+
+// ---- Access Events ----
+model AccessEvent {
+  id              String    @id @default(uuid())
+  assetId         String    @map("asset_id")
+  eventType       String    @map("event_type") // detail_view, download, api_detail, batch_download, permanent_share_download
+  tokenId         String?   @map("token_id")
+  shareId         String?   @map("share_id")
+  ipHash          String?   @map("ip_hash")
+  userAgentHash   String?   @map("user_agent_hash")
+  referer         String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  asset           MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([createdAt])
+  @@index([tokenId])
+  @@map("access_events")
+}
+
+// ---- Daily Stats Aggregation ----
+model AssetStatsDaily {
+  id               String    @id @default(uuid())
+  assetId          String    @map("asset_id")
+  date             DateTime  @db.Date
+  detailViewCount  Int       @default(0) @map("detail_view_count")
+  downloadCount    Int       @default(0) @map("download_count")
+  uniqueIpCount    Int       @default(0) @map("unique_ip_count")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  asset            MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, date])
+  @@index([assetId])
+  @@index([date])
+  @@map("asset_stats_daily")
+}
+
+// ---- Similarity Candidates ----
+model SimilarityCandidate {
+  id                    String    @id @default(uuid())
+  assetAId              String    @map("asset_a_id")
+  assetBId              String    @map("asset_b_id")
+  sha256Equal           Boolean   @default(false) @map("sha256_equal")
+  phashDistance          Int?      @map("phash_distance")
+  dhashDistance          Int?      @map("dhash_distance")
+  ssimScore             Float?    @map("ssim_score")
+  diffAreaRatio         Float?    @map("diff_area_ratio")
+  similarityType        String    @map("similarity_type") // exact_duplicate, highly_similar, possible_variant, same_topic, unrelated
+  qualityWinnerAssetId  String?   @map("quality_winner_asset_id")
+  status                String    @default("pending") // pending, kept_both, delete_a, delete_b, marked_variant, ignored, resolved
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  assetA                MediaAsset @relation("SimilarityA", fields: [assetAId], references: [id], onDelete: Cascade)
+  assetB                MediaAsset @relation("SimilarityB", fields: [assetBId], references: [id], onDelete: Cascade)
+
+  @@unique([assetAId, assetBId])
+  @@index([assetAId])
+  @@index([assetBId])
+  @@index([status])
+  @@map("similarity_candidates")
+}
+
+// ---- Trash Items ----
+model TrashItem {
+  id              String      @id @default(uuid())
+  assetId         String      @unique @map("asset_id")
+  deletedByTokenId String     @map("deleted_by_token_id")
+  deleteReason    String?     @map("delete_reason")
+  originalStatus  String      @map("original_status")
+  deletedAt       DateTime    @default(now()) @map("deleted_at")
+  restoreUntil    DateTime?   @map("restore_until")
+  purgedAt        DateTime?   @map("purged_at")
+
+  asset           MediaAsset  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  deletedByToken  AccessToken @relation(fields: [deletedByTokenId], references: [id])
+
+  @@index([deletedAt])
+  @@map("trash_items")
+}
+
+// ---- Batch Jobs ----
+model BatchJob {
+  id              String      @id @default(uuid())
+  jobType         String      @map("job_type") // upload_process, batch_tag, etc.
+  status          String      @default("pending") // pending, running, completed, failed, cancelled
+  payloadJson     String?     @map("payload_json")
+  resultJson      String?     @map("result_json")
+  errorMessage    String?     @map("error_message")
+  progress        Float       @default(0) // 0-100
+  createdByTokenId String?    @map("created_by_token_id")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  createdByToken  AccessToken? @relation("JobCreatedBy", fields: [createdByTokenId], references: [id], onDelete: SetNull)
+
+  @@index([jobType])
+  @@index([status])
+  @@map("batch_jobs")
+}
+
+// ---- Audit Logs ----
+model AuditLog {
+  id          String      @id @default(uuid())
+  tokenId     String      @map("token_id")
+  action      String
+  targetType  String?     @map("target_type")
+  targetId    String?     @map("target_id")
+  detailJson  String?     @map("detail_json")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  token       AccessToken @relation(fields: [tokenId], references: [id])
+
+  @@index([tokenId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

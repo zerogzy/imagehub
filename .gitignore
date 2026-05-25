@@ -1,0 +1,69 @@
+# ============================================================
+# ImageHub .gitignore
+# ============================================================
+
+# ---- Dependencies ----
+node_modules/
+
+# ---- Build output ----
+dist/
+.next/
+out/
+*.tsbuildinfo
+
+# ---- Environment ----
+.env
+.env.local
+.env.*.local
+
+# ---- Storage (user-uploaded / generated files) ----
+/storage/
+storage/original/
+storage/preview/
+storage/video/
+storage/audio/
+storage/exports/
+storage/temp/
+
+# ---- Local backups ----
+/backup-*/
+*.bak-*
+
+# ---- IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Prisma ----
+apps/api/prisma/migrations/
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# ---- Docker volumes ----
+infra/mysql/data/
+infra/redis/data/
+infra/meilisearch/data/
+
+# ---- Test / Coverage ----
+coverage/
+.nyc_output/
+
+# ---- Misc ----
+*.bak
+*.tmp
