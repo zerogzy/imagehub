@@ -56,58 +56,49 @@
   @apply bg-primary/30;
 }
 
-/* Dense justified photo wall */
+/* Immich-style justified photo wall */
 .photo-wall {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: stretch;
-}
-
-.photo-wall::after {
-  content: '';
-  flex-grow: 9999;
-  min-width: 160px;
+  position: relative;
+  width: 100%;
+  min-height: 240px;
+  contain: layout paint style;
 }
 
 .photo-wall-item {
-  height: 180px;
-  min-width: 96px;
+  border-radius: 3px;
+  touch-action: manipulation;
 }
 
-@media (max-width: 1280px) {
-  .photo-wall-item {
-    height: 160px;
-  }
+.photo-wall-positioned {
+  left: 0;
+  position: absolute;
+  top: 0;
+  will-change: transform;
+  contain: layout paint;
 }
 
-@media (max-width: 768px) {
-  .photo-wall {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 5px;
-    align-items: start;
-  }
-
-  .photo-wall::after {
-    display: none;
-  }
-
-  .photo-wall-item {
-    aspect-ratio: var(--photo-ratio);
-    height: auto;
-    min-width: 0;
-    width: 100%;
-  }
+.photo-wall-item img {
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
-@media (max-width: 480px) {
-  .photo-wall {
-    gap: 4px;
-  }
+.photo-wall-mobile-grid {
+  contain: layout paint style;
+  display: grid;
+  gap: 2px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+}
 
+.photo-wall-mobile-item {
+  aspect-ratio: 1 / 1;
+  border-radius: 2px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
   .photo-wall-item {
-    min-height: 0;
+    border-radius: 2px;
   }
 }
 

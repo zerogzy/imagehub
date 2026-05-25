@@ -36,9 +36,11 @@ interface MediaCardProps {
   selected?: boolean;
   onSelect?: () => void;
   isMultiSelectMode?: boolean;
+  className?: string;
+  style?: CSSProperties;
 }
 
-export function MediaCard({ asset, onClick, selected, onSelect, isMultiSelectMode }: MediaCardProps) {
+export function MediaCard({ asset, onClick, selected, onSelect, isMultiSelectMode, className, style }: MediaCardProps) {
   const [loaded, setLoaded] = useState(false);
   const [hovered, setHovered] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -78,11 +80,11 @@ export function MediaCard({ asset, onClick, selected, onSelect, isMultiSelectMod
     <div
       style={{
         '--photo-ratio': aspectRatio > 0 ? aspectRatio : 1,
-        flexGrow: Math.max(0.55, aspectRatio),
-        flexBasis: `${Math.max(96, aspectRatio * 180)}px`,
+        ...style,
       } as CSSProperties}
       className={cn(
-        'photo-wall-item group relative cursor-pointer overflow-hidden bg-background-secondary transition-all duration-150',
+        'photo-wall-item group relative cursor-pointer overflow-hidden bg-background-secondary transition-[box-shadow,filter,opacity] duration-150',
+        className,
         selected && 'ring-2 ring-primary ring-offset-1',
       )}
       onMouseEnter={() => setHovered(true)}
@@ -111,7 +113,7 @@ export function MediaCard({ asset, onClick, selected, onSelect, isMultiSelectMod
             src={imageUrl}
             alt={asset.displayFilename || asset.originalFilename}
             className={cn(
-              'h-full w-full object-contain transition-opacity duration-200 md:object-cover',
+              'h-full w-full object-cover transition-opacity duration-200',
               loaded ? 'opacity-100' : 'opacity-0',
             )}
             loading="lazy"

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useGalleryStore } from '@/stores/gallery-store';
 import { apiFetch } from '@/lib/utils';
-import { MediaCard } from './media-card';
+import { JustifiedPhotoWall } from './justified-photo-wall';
 import { AssetDetailModal } from './asset-detail-modal';
 import { MediaType } from '@imagehub/shared';
 import { Loader2, ImageOff } from 'lucide-react';
@@ -139,22 +139,14 @@ export function GalleryPage() {
         </span>
       </div>
 
-      {/* Image grid */}
+      {/* Justified photo wall */}
       {assets.length === 0 && !loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-text-muted">
           <ImageOff className="mb-4 h-12 w-12" />
           <p className="text-sm">暂无媒体文件</p>
         </div>
       ) : (
-        <div className="photo-wall">
-          {assets.map((asset) => (
-            <MediaCard
-              key={asset.id}
-              asset={asset}
-              onClick={() => setDetailAssetId(asset.id)}
-            />
-          ))}
-        </div>
+        <JustifiedPhotoWall assets={assets} onAssetClick={(asset) => setDetailAssetId(asset.id)} />
       )}
 
       {/* Loading indicator */}
