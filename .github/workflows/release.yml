@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  NODE_ENV: production
+  DATABASE_URL: mysql://imagehub:imagehub@127.0.0.1:3306/imagehub
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Capture release metadata
+        id: meta
+        run: |
+          echo "tag_name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "archive_name=imagehub-${GITHUB_REF_NAME}.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "staging_dir=release-${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
+      - name: Generate Prisma client
+        run: npm run db:generate --workspace=apps/api
+
+      - name: Build API
+        run: npm run build:api
+
+      - name: Build Web
+        run: npm run build:web
+
+      - name: Compile worker
+        run: python3 -m compileall apps/worker-ai
+
+      - name: Prepare release bundle
+        run: |
+          mkdir -p "${{ steps.meta.outputs.staging_dir }}/imagehub"
+          rsync -a --delete \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude 'storage' \
+            --exclude '.next/cache' \
+            --exclude '.venv' \
+            --exclude '*.log' \
+            ./ "${{ steps.meta.outputs.staging_dir }}/imagehub/"
+          tar -czf "${{ steps.meta.outputs.archive_name }}" -C "${{ steps.meta.outputs.staging_dir }}" imagehub
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          name: ImageHub ${{ steps.meta.outputs.tag_name }}
+          body: |
+            Automated release for ImageHub ${{ steps.meta.outputs.tag_name }}.
+            Built from commit ${{ github.sha }}.
+          files: ${{ steps.meta.outputs.archive_name }}
+          generate_release_notes: true
