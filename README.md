@@ -57,7 +57,7 @@ npm run db:generate
 npm run build
 ```
 
-首次启动 API 时，如果数据库为空，会自动执行 Prisma `db push` 初始化表结构。
+数据库需要先执行 `npm run db:push` 初始化表结构。生产环境建议使用低权限运行账号，并用单独的 `MIGRATION_DATABASE_URL` 执行初始化或升级。
 
 开发模式：
 
@@ -84,6 +84,8 @@ npm run db:seed
 复制 `.env.example` 为 `.env`，并按实际环境配置：
 
 - `DATABASE_URL`
+- `MIGRATION_DATABASE_URL`，仅初始化或升级数据库时需要
+- `AUTO_INIT_DB`，生产运行保持 `false`
 - `REDIS_HOST`
 - `REDIS_PORT`
 - `REDIS_PASSWORD`

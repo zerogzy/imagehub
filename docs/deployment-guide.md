@@ -106,6 +106,8 @@ vim .env
 MYSQL_ROOT_PASSWORD=your_strong_root_password
 MYSQL_PASSWORD=your_strong_imagehub_password
 DATABASE_URL=mysql://imagehub:your_strong_imagehub_password@mysql:3306/imagehub
+MIGRATION_DATABASE_URL=mysql://imagehub:your_strong_imagehub_password@mysql:3306/imagehub
+AUTO_INIT_DB=false
 
 # Redis 密码（必须修改）
 REDIS_PASSWORD=your_strong_redis_password
@@ -117,25 +119,28 @@ MEILISEARCH_API_KEY=your_meili_master_key
 STORAGE_ROOT=/app/storage
 ```
 
-### 4. 启动所有服务
+### 4. 启动基础服务
 
 ```bash
-# 构建并启动
-docker compose -f infra/docker/docker-compose.yml up -d --build
-
-# 查看启动日志
-docker compose -f infra/docker/docker-compose.yml logs -f
+docker compose -f infra/docker/docker-compose.yml up -d mysql redis meilisearch
+docker compose -f infra/docker/docker-compose.yml ps
 ```
 
 ### 5. 初始化数据库
 
 ```bash
-# 等待 MySQL 健康检查通过后执行
-docker exec -it imagehub-api npx prisma migrate deploy
-docker exec -it imagehub-api npx prisma db seed
+docker compose -f infra/docker/docker-compose.yml run --rm api npm run db:push --workspace=apps/api
+docker compose -f infra/docker/docker-compose.yml run --rm api npm run db:seed --workspace=apps/api
 ```
 
-### 6. 验证部署
+### 6. 启动所有服务
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d --build
+docker compose -f infra/docker/docker-compose.yml logs -f
+```
+
+### 7. 验证部署
 
 ```bash
 # 检查所有容器状态
@@ -203,8 +208,13 @@ sudo mysql_secure_installation
 # 创建数据库和用户
 sudo mysql -u root -p <<EOF
 CREATE DATABASE imagehub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'imagehub'@'localhost' IDENTIFIED BY 'your_strong_password';
-GRANT ALL PRIVILEGES ON imagehub.* TO 'imagehub'@'localhost';
+
+CREATE USER 'imagehub'@'localhost' IDENTIFIED BY 'your_runtime_password';
+GRANT SELECT, INSERT, UPDATE, DELETE ON imagehub.* TO 'imagehub'@'localhost';
+
+CREATE USER 'imagehub_migrator'@'localhost' IDENTIFIED BY 'your_migration_password';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON imagehub.* TO 'imagehub_migrator'@'localhost';
+
 FLUSH PRIVILEGES;
 EOF
 ```
@@ -309,7 +319,9 @@ WEB_URL=http://your-domain.com
 API_URL=http://127.0.0.1:3001
 
 # ---- MySQL ----
-DATABASE_URL=mysql://imagehub:your_strong_password@127.0.0.1:3306/imagehub
+DATABASE_URL=mysql://imagehub:your_runtime_password@127.0.0.1:3306/imagehub
+MIGRATION_DATABASE_URL=mysql://imagehub_migrator:your_migration_password@127.0.0.1:3306/imagehub
+AUTO_INIT_DB=false
 
 # ---- Redis ----
 REDIS_HOST=127.0.0.1

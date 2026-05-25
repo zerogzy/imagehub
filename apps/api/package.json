@@ -8,12 +8,12 @@
     "start": "node dist/src/main.js",
     "start:prod": "node dist/src/main.js",
     "lint": "eslint \"src/**/*.ts\"",
-    "db:generate": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ../../node_modules/prisma/build/index.js generate",
-    "db:push": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ../../node_modules/prisma/build/index.js db push --skip-generate",
-    "db:migrate": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ../../node_modules/prisma/build/index.js migrate dev",
-    "db:migrate:prod": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ../../node_modules/prisma/build/index.js migrate deploy",
+    "db:generate": "node scripts/prisma-cli.js generate",
+    "db:push": "node scripts/prisma-cli.js db push --skip-generate",
+    "db:migrate": "node scripts/prisma-cli.js migrate dev",
+    "db:migrate:prod": "node scripts/prisma-cli.js migrate deploy",
     "db:seed": "DOTENV_CONFIG_PATH=../../.env ts-node -r dotenv/config prisma/seed.ts",
-    "db:studio": "DOTENV_CONFIG_PATH=../../.env node -r dotenv/config ../../node_modules/prisma/build/index.js studio"
+    "db:studio": "node scripts/prisma-cli.js studio"
   },
   "dependencies": {
     "@imagehub/shared": "^1.0.0",

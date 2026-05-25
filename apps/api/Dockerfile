@@ -33,11 +33,13 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 
-# Install production dependencies only
-RUN npm ci --workspace=packages/shared --workspace=apps/api --omit=dev
+# Keep Prisma CLI and ts-node available so release containers can run db init/seed commands.
+RUN npm ci --workspace=packages/shared --workspace=apps/api
 
 # Copy built files
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/apps/api/scripts ./apps/api/scripts
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 
 # Create storage directory
@@ -45,4 +47,4 @@ RUN mkdir -p /app/storage/original /app/storage/preview /app/storage/video /app/
 
 EXPOSE 3001
 
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["node", "apps/api/dist/src/main.js"]

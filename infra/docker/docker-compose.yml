@@ -73,6 +73,8 @@ services:
       NODE_ENV: production
       APP_PORT: 3001
       DATABASE_URL: mysql://imagehub:${MYSQL_PASSWORD:-imagehub_secret}@mysql:3306/imagehub
+      MIGRATION_DATABASE_URL: mysql://imagehub:${MYSQL_PASSWORD:-imagehub_secret}@mysql:3306/imagehub
+      AUTO_INIT_DB: ${AUTO_INIT_DB:-false}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-imagehub_redis_secret}

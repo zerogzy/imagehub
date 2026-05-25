@@ -42,8 +42,18 @@ export class PrismaService
       return;
     }
 
+    if (process.env.AUTO_INIT_DB !== 'true') {
+      throw new Error(
+        'ImageHub database has no tables. Initialize it once with npm run db:push, then run the API with a least-privilege DATABASE_URL. Set AUTO_INIT_DB=true only for trusted first-run environments.'
+      );
+    }
+
     const apiDir = this.resolveApiDir();
     const prismaBin = this.resolvePrismaBin(apiDir);
+    const env = { ...process.env };
+    if (process.env.MIGRATION_DATABASE_URL) {
+      env.DATABASE_URL = process.env.MIGRATION_DATABASE_URL;
+    }
 
     console.log('🧱 Empty database detected, running Prisma db push...');
     execFileSync(
@@ -52,7 +62,7 @@ export class PrismaService
       {
         cwd: apiDir,
         stdio: 'inherit',
-        env: process.env,
+        env,
       }
     );
     console.log('✅ Prisma schema initialized');

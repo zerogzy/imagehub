@@ -51,16 +51,22 @@ mariadb
 
 ```sql
 CREATE DATABASE imagehub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'imagehub'@'localhost' IDENTIFIED BY 'CHANGE_ME_DATABASE_PASSWORD';
-GRANT ALL PRIVILEGES ON imagehub.* TO 'imagehub'@'localhost';
+
+CREATE USER 'imagehub'@'localhost' IDENTIFIED BY 'CHANGE_ME_RUNTIME_PASSWORD';
+GRANT SELECT, INSERT, UPDATE, DELETE ON imagehub.* TO 'imagehub'@'localhost';
+
+CREATE USER 'imagehub_migrator'@'localhost' IDENTIFIED BY 'CHANGE_ME_MIGRATION_PASSWORD';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON imagehub.* TO 'imagehub_migrator'@'localhost';
+
 FLUSH PRIVILEGES;
 EXIT;
 ```
 
 注意：
 
-- 这里只需要创建空数据库和账号，不需要手动建表。
-- 项目首次启动 API 时会自动检查表是否存在；如果数据库为空，会自动执行 Prisma `db push` 初始化表结构。
+- 日常 API 只使用 `imagehub` 运行账号，不需要 root，也不需要建表/改表权限。
+- `imagehub_migrator` 只用于首次初始化或升级 schema。初始化完成后可以锁定、改密或临时启用。
+- 项目不会默认在 API 启动时自动建表。空库需要先执行 `npm run db:push`。
 
 ## 3. 配置 Redis
 
@@ -155,7 +161,9 @@ NODE_ENV=production
 WEB_URL=https://your-domain.example
 API_URL=https://your-domain.example/api/v1
 
-DATABASE_URL=mysql://imagehub:CHANGE_ME_DATABASE_PASSWORD@localhost:3306/imagehub
+DATABASE_URL=mysql://imagehub:CHANGE_ME_RUNTIME_PASSWORD@localhost:3306/imagehub
+MIGRATION_DATABASE_URL=mysql://imagehub_migrator:CHANGE_ME_MIGRATION_PASSWORD@localhost:3306/imagehub
+AUTO_INIT_DB=false
 
 REDIS_HOST=localhost
 REDIS_PORT=6379
@@ -199,7 +207,10 @@ cd /opt/imagehub
 
 ```bash
 npm run db:generate
+npm run db:push
 ```
+
+`db:push` 会优先使用 `MIGRATION_DATABASE_URL`，因此可以把 API 常驻运行的 `DATABASE_URL` 保持为低权限账号。
 
 如项目需要初始化种子数据：
 
@@ -207,11 +218,7 @@ npm run db:generate
 npm run db:seed
 ```
 
-如果你想手动同步表结构，也可以执行：
-
-```bash
-npm run db:push
-```
+`db:seed` 使用 `DATABASE_URL`，只需要普通写入权限。
 
 ## 9. 构建项目
 
