@@ -1,6 +1,28 @@
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
+import { existsSync } from 'fs';
+import * as path from 'path';
+import { config as loadEnv } from 'dotenv';
+
+const envPaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '../../.env'),
+  path.resolve(process.cwd(), '../../.env.local'),
+  path.resolve(__dirname, '../../../.env'),
+  path.resolve(__dirname, '../../../.env.local'),
+];
+
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    loadEnv({ path: envPath });
+  }
+}
+
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL is required. Put it in /opt/imagehub/.env or export it before running db scripts.');
+}
 
 const prisma = new PrismaClient();
 

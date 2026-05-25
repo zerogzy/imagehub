@@ -57,6 +57,14 @@ jobs:
       - name: Compile worker
         run: python3 -m compileall apps/worker-ai
 
+      - name: Verify release build outputs
+        run: |
+          test -f apps/api/dist/src/main.js
+          test -f apps/api/dist/src/storage/storage.module.js
+          test -f apps/web/.next/standalone/apps/web/server.js
+          test -d apps/web/.next/static
+          test -f packages/shared/dist/index.js
+
       - name: Prepare release bundle
         run: |
           mkdir -p "${{ steps.meta.outputs.staging_dir }}/imagehub"
