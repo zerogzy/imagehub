@@ -57,6 +57,11 @@ FLUSH PRIVILEGES;
 EXIT;
 ```
 
+注意：
+
+- 这里只需要创建空数据库和账号，不需要手动建表。
+- 项目首次启动 API 时会自动检查表是否存在；如果数据库为空，会自动执行 Prisma `db push` 初始化表结构。
+
 ## 3. 配置 Redis
 
 编辑 Redis 配置：
@@ -194,13 +199,18 @@ cd /opt/imagehub
 
 ```bash
 npm run db:generate
-npm run db:migrate
 ```
 
 如项目需要初始化种子数据：
 
 ```bash
 npm run db:seed
+```
+
+如果你想手动同步表结构，也可以执行：
+
+```bash
+npm run db:push
 ```
 
 ## 9. 构建项目
@@ -296,12 +306,13 @@ cd /opt/imagehub
 git pull
 npm install
 npm run db:generate
-npm run db:migrate
 npm run build:api
 npm run build:web
 pm2 restart imagehub-api imagehub-web --update-env
 pm2 restart imagehub-worker-ai --update-env
 ```
+
+首次启动 API 时会自动初始化空数据库的表结构，不需要再手动执行 `db:migrate`。
 
 ## 14. 清理构建和缓存
 
