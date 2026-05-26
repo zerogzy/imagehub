@@ -13,7 +13,7 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "build:web": "npm run build --workspace=apps/web",
     "build:api": "npm run build --workspace=apps/api",
-    "build": "npm run build:api && npm run build:web",
+    "build": "npm run build:shared && npm run build:api && npm run build:web",
     "lint": "npm run lint --workspaces",
     "db:generate": "npm run db:generate --workspace=apps/api",
     "db:push": "npm run db:push --workspace=apps/api",
@@ -21,7 +21,8 @@
     "db:seed": "npm run db:seed --workspace=apps/api",
     "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
-    "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f"
+    "docker:logs": "docker compose -f infra/docker/docker-compose.yml logs -f",
+    "build:shared": "npm run build --workspace=packages/shared"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

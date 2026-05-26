@@ -223,8 +223,7 @@ npm run db:seed
 ## 9. 构建项目
 
 ```bash
-npm run build:api
-npm run build:web
+npm run build
 ```
 
 构建产物：
@@ -233,13 +232,16 @@ npm run build:web
 - Web: `apps/web/.next`
 - Shared package: `packages/shared/dist`
 
+`npm run build` 会先构建 `packages/shared`，再构建 API 和 Web。
+
 ## 10. 配置 PM2
 
 项目根目录已提供 `ecosystem.config.js` 示例。确认其中路径与端口正确：
 
 - API: `node apps/api/dist/src/main.js`
 - Web: `apps/web/.next/standalone/apps/web/server.js`
-- Worker: `apps/worker-ai/.venv/bin/python main.py`
+- Worker: `interpreter` 可由 `PYTHON_BIN` 覆盖，默认回退到 `python3` 运行 `main.py`
+- Worker 的存储目录默认指向 `/opt/imagehub/storage`，也可通过 `STORAGE_ROOT` 覆盖
 
 启动：
 
@@ -313,8 +315,7 @@ cd /opt/imagehub
 git pull
 npm install
 npm run db:generate
-npm run build:api
-npm run build:web
+npm run build
 pm2 restart imagehub-api imagehub-web --update-env
 pm2 restart imagehub-worker-ai --update-env
 ```

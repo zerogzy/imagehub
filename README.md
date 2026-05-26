@@ -59,6 +59,8 @@ npm run build
 
 数据库需要先执行 `npm run db:push` 初始化表结构。生产环境建议使用低权限运行账号，并用单独的 `MIGRATION_DATABASE_URL` 执行初始化或升级。
 
+`npm run build` 会先构建 `packages/shared`，再构建 API 和 Web。
+
 开发模式：
 
 ```bash
@@ -92,6 +94,7 @@ npm run db:seed
 - `MEILISEARCH_HOST`
 - `MEILISEARCH_API_KEY`
 - `STORAGE_ROOT`
+- `PYTHON_BIN`，可选；用于覆盖 worker 解释器
 - `WEB_URL`
 - `API_URL`
 
