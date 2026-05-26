@@ -26,57 +26,31 @@ if (!process.env.DATABASE_URL) {
 
 const prisma = new PrismaClient();
 
-async function main() {
-  console.log('🌱 Seeding database...');
-
-  // Create initial admin token
+async function createToken(params: { name: string; role: 'admin' | 'visitor' }) {
   const rawToken = crypto.randomBytes(32).toString('hex');
   const tokenHash = await bcrypt.hash(rawToken, 12);
   const tokenPrefix = rawToken.substring(0, 8);
 
-  const adminToken = await prisma.accessToken.create({
+  await prisma.accessToken.create({
     data: {
-      name: 'Initial Admin Token',
+      name: params.name,
       tokenHash,
       tokenPrefix,
-      role: 'admin',
+      role: params.role,
       enabled: true,
     },
   });
 
-  console.log('');
-  console.log('✅ Admin token created successfully!');
-  console.log('');
-  console.log('⚠️  SAVE THIS TOKEN NOW - IT WILL NOT BE SHOWN AGAIN:');
-  console.log(`🔑 ${rawToken}`);
-  console.log(`ADMIN_TOKEN=${rawToken}`);
-  console.log(`📌 Prefix: ${tokenPrefix}`);
-  console.log('');
+  return { rawToken, tokenPrefix };
+}
 
-  // Create a visitor token
-  const visitorRawToken = crypto.randomBytes(32).toString('hex');
-  const visitorTokenHash = await bcrypt.hash(visitorRawToken, 12);
-  const visitorTokenPrefix = visitorRawToken.substring(0, 8);
+async function main() {
+  console.log('🌱 Seeding database...');
 
-  const visitorToken = await prisma.accessToken.create({
-    data: {
-      name: 'Default Visitor Token',
-      tokenHash: visitorTokenHash,
-      tokenPrefix: visitorTokenPrefix,
-      role: 'visitor',
-      enabled: true,
-    },
-  });
-
-  console.log('✅ Visitor token created:');
-  console.log(`🔑 ${visitorRawToken}`);
-  console.log(`VISITOR_TOKEN=${visitorRawToken}`);
-  console.log(`📌 Prefix: ${visitorTokenPrefix}`);
-  console.log('');
-
-  // Create a sample group
-  const group = await prisma.group.create({
-    data: {
+  // Create or update a sample group. Seed must be safe to run more than once.
+  const group = await prisma.group.upsert({
+    where: { slug: 'demo' },
+    create: {
       name: '示例分组',
       slug: 'demo',
       description: '这是一个示例分组',
@@ -84,9 +58,65 @@ async function main() {
       randomEnabled: true,
       randomRotateInterval: 60,
     },
+    update: {
+      name: '示例分组',
+      description: '这是一个示例分组',
+      randomEnabled: true,
+      randomRotateInterval: 60,
+    },
   });
 
-  console.log(`✅ Sample group created: ${group.name}`);
+  await prisma.subgroup.upsert({
+    where: { id: `${group.id}:default-seed-subgroup` },
+    create: {
+      id: `${group.id}:default-seed-subgroup`,
+      groupId: group.id,
+      name: '默认',
+      rankKey: '1',
+    },
+    update: {
+      name: '默认',
+      rankKey: '1',
+    },
+  });
+
+  console.log(`✅ Sample group ready: ${group.name}`);
+  console.log('');
+
+  const enabledAdminCount = await prisma.accessToken.count({
+    where: { role: 'admin', enabled: true },
+  });
+  if (enabledAdminCount === 0) {
+    const admin = await createToken({ name: 'Initial Admin Token', role: 'admin' });
+
+    console.log('✅ Admin token created successfully!');
+    console.log('');
+    console.log('⚠️  SAVE THIS TOKEN NOW - IT WILL NOT BE SHOWN AGAIN:');
+    console.log(`🔑 ${admin.rawToken}`);
+    console.log(`ADMIN_TOKEN=${admin.rawToken}`);
+    console.log(`📌 Prefix: ${admin.tokenPrefix}`);
+    console.log('');
+  } else {
+    console.log(`ℹ️  Skipped admin token creation (${enabledAdminCount} enabled admin token(s) already exist).`);
+    console.log('');
+  }
+
+  const enabledVisitorCount = await prisma.accessToken.count({
+    where: { role: 'visitor', enabled: true },
+  });
+  if (enabledVisitorCount === 0) {
+    const visitor = await createToken({ name: 'Default Visitor Token', role: 'visitor' });
+
+    console.log('✅ Visitor token created:');
+    console.log(`🔑 ${visitor.rawToken}`);
+    console.log(`VISITOR_TOKEN=${visitor.rawToken}`);
+    console.log(`📌 Prefix: ${visitor.tokenPrefix}`);
+    console.log('');
+  } else {
+    console.log(`ℹ️  Skipped visitor token creation (${enabledVisitorCount} enabled visitor token(s) already exist).`);
+    console.log('');
+  }
+
   console.log('');
   console.log('🎉 Seeding complete!');
 }
