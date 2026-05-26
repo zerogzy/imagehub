@@ -3,7 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { DerivativeService } from '../derivative/derivative.service';
 import { SearchService } from '../search/search.service';
-import { getMediaTypeFromMime, MediaType, AssetStatus } from '@imagehub/shared';
+import { GroupService } from '../group/group.service';
+import { getMediaTypeFromMime, AssetStatus } from '@imagehub/shared';
 import * as crypto from 'crypto';
 import * as path from 'path';
 
@@ -16,6 +17,7 @@ export class UploadService {
     private storageService: StorageService,
     private derivativeService: DerivativeService,
     private searchService: SearchService,
+    private groupService: GroupService,
   ) {}
 
   async processUploadedFile(params: {
@@ -31,7 +33,8 @@ export class UploadService {
     subgroupId?: string;
     tokenId: string;
   }) {
-    const { file, groupId, subgroupId, tokenId } = params;
+    const { file } = params;
+    const target = await this.resolveUploadTarget(params.groupId, params.subgroupId);
     const assetId = crypto.randomUUID();
 
     const mediaType = getMediaTypeFromMime(file.mimetype);
@@ -59,17 +62,17 @@ export class UploadService {
         });
       }
 
-      if (groupId) {
+      if (target.groupId) {
         await this.prisma.groupAsset.upsert({
-          where: { groupId_assetId: { groupId, assetId: existingAsset.id } },
+          where: { groupId_assetId: { groupId: target.groupId, assetId: existingAsset.id } },
           create: {
-            groupId,
-            subgroupId: subgroupId || null,
+            groupId: target.groupId,
+            subgroupId: target.subgroupId,
             assetId: existingAsset.id,
             rankKey: Date.now().toString(36),
           },
           update: {
-            subgroupId: subgroupId || null,
+            subgroupId: target.subgroupId,
           },
         });
       }
@@ -113,11 +116,11 @@ export class UploadService {
       },
     });
 
-    if (groupId) {
+    if (target.groupId) {
       await this.prisma.groupAsset.create({
         data: {
-          groupId,
-          subgroupId: subgroupId || null,
+          groupId: target.groupId,
+          subgroupId: target.subgroupId,
           assetId,
           rankKey: Date.now().toString(36),
         },
@@ -157,6 +160,23 @@ export class UploadService {
       mediaType,
       status: AssetStatus.PROCESSING,
     };
+  }
+
+  private async resolveUploadTarget(groupId?: string, subgroupId?: string) {
+    if (!groupId) {
+      const target = await this.groupService.ensureDefaultHierarchy();
+      return {
+        groupId: target.group.id,
+        subgroupId: target.subgroup.id,
+      };
+    }
+
+    if (subgroupId) {
+      return { groupId, subgroupId };
+    }
+
+    const subgroup = await this.groupService.ensureDefaultSubgroup(groupId);
+    return { groupId, subgroupId: subgroup.id };
   }
 
   private extFromMime(mime: string): string {

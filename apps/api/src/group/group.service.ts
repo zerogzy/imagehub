@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class GroupService {
   constructor(private prisma: PrismaService) {}
+  private readonly DEFAULT_NAME = '默认';
+  private readonly DEFAULT_SLUG = 'default';
   private readonly RANK_WIDTH = 12;
   private readonly RANK_RADIX = 36n;
   private readonly RANK_MAX = this.RANK_RADIX ** BigInt(this.RANK_WIDTH) - 1n;
@@ -13,6 +15,7 @@ export class GroupService {
    * Includes subgroups and their asset counts.
    */
   async listGroups() {
+    await this.ensureDefaultHierarchy();
     return this.prisma.group.findMany({
       orderBy: { rankKey: 'asc' },
       include: {
@@ -60,14 +63,87 @@ export class GroupService {
       ? (parseInt(lastGroup.rankKey, 36) + 1).toString(36)
       : '1';
 
-    return this.prisma.group.create({
+    return this.prisma.$transaction(async (tx) => {
+      const group = await tx.group.create({
+        data: {
+          name: data.name,
+          slug: await this.uniqueGroupSlug(data.slug || data.name, tx),
+          description: data.description,
+          rankKey,
+          randomEnabled: data.randomEnabled || false,
+          randomRotateInterval: data.randomRotateInterval,
+        },
+      });
+
+      await tx.subgroup.create({
+        data: {
+          groupId: group.id,
+          name: this.DEFAULT_NAME,
+          rankKey: '1',
+        },
+      });
+
+      return group;
+    });
+  }
+
+  async ensureDefaultHierarchy() {
+    return this.prisma.$transaction(async (tx) => {
+      let group = await tx.group.findFirst({
+        where: {
+          OR: [
+            { slug: this.DEFAULT_SLUG },
+            { name: this.DEFAULT_NAME },
+          ],
+        },
+        include: { subgroups: { orderBy: { rankKey: 'asc' } } },
+      });
+
+      if (group) {
+        group = await tx.group.update({
+          where: { id: group.id },
+          data: {
+            name: this.DEFAULT_NAME,
+            rankKey: '0',
+          },
+          include: { subgroups: { orderBy: { rankKey: 'asc' } } },
+        });
+      } else {
+        group = await tx.group.create({
+          data: {
+            name: this.DEFAULT_NAME,
+            slug: await this.uniqueGroupSlug(this.DEFAULT_SLUG, tx),
+            rankKey: '0',
+          },
+          include: { subgroups: { orderBy: { rankKey: 'asc' } } },
+        });
+      }
+
+      const existingDefaultSubgroup = group.subgroups.find((subgroup) => subgroup.name === this.DEFAULT_NAME);
+      const defaultSubgroup = existingDefaultSubgroup || await tx.subgroup.create({
+        data: {
+          groupId: group.id,
+          name: this.DEFAULT_NAME,
+          rankKey: '1',
+        },
+      });
+
+      return { group, subgroup: defaultSubgroup };
+    });
+  }
+
+  async ensureDefaultSubgroup(groupId: string) {
+    const existing = await this.prisma.subgroup.findFirst({
+      where: { groupId, name: this.DEFAULT_NAME },
+      orderBy: { rankKey: 'asc' },
+    });
+    if (existing) return existing;
+
+    return this.prisma.subgroup.create({
       data: {
-        name: data.name,
-        slug: data.slug,
-        description: data.description,
-        rankKey,
-        randomEnabled: data.randomEnabled || false,
-        randomRotateInterval: data.randomRotateInterval,
+        groupId,
+        name: this.DEFAULT_NAME,
+        rankKey: '1',
       },
     });
   }
@@ -360,6 +436,28 @@ export class GroupService {
 
   private formatRank(value: bigint) {
     return value.toString(36).padStart(this.RANK_WIDTH, '0');
+  }
+
+  private normalizeSlug(value: string) {
+    const slug = value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return slug || this.DEFAULT_SLUG;
+  }
+
+  private async uniqueGroupSlug(value: string, tx: any = this.prisma) {
+    const base = this.normalizeSlug(value);
+    let slug = base;
+    let suffix = 2;
+
+    while (await tx.group.findUnique({ where: { slug }, select: { id: true } })) {
+      slug = `${base}-${suffix}`;
+      suffix += 1;
+    }
+
+    return slug;
   }
 
   private async rebalanceGroupAssetRanks(groupId: string, subgroupId: string | null) {

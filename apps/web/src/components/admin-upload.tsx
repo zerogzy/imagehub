@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiFetch, formatFileSize } from '@/lib/utils';
-import { showToast } from '@/lib/toast';
 import {
   Upload,
   X,
@@ -13,7 +12,6 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  FolderOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,9 +44,28 @@ export function UploadCenter() {
   useEffect(() => {
     if (!token) return;
     apiFetch<UploadGroup[]>('/groups', token).then((result) => {
-      if (result.data) setGroups(result.data);
+      if (result.data) {
+        setGroups(result.data);
+        const firstGroup = result.data[0];
+        if (firstGroup) {
+          setGroupId((currentGroupId) => currentGroupId || firstGroup.id);
+          setSubgroupId((currentSubgroupId) => currentSubgroupId || firstGroup.subgroups?.[0]?.id || '');
+        }
+      }
     });
   }, [token]);
+
+  useEffect(() => {
+    if (!selectedGroup) return;
+    const subgroups = selectedGroup.subgroups || [];
+    if (subgroups.length === 0) {
+      setSubgroupId('');
+      return;
+    }
+    if (!subgroups.some((subgroup) => subgroup.id === subgroupId)) {
+      setSubgroupId(subgroups[0].id);
+    }
+  }, [selectedGroup, subgroupId]);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const uploadingFiles: UploadingFile[] = Array.from(newFiles).map((file) => ({
@@ -201,12 +218,12 @@ export function UploadCenter() {
           <select
             value={groupId}
             onChange={(e) => {
+              const nextGroup = groups.find((group) => group.id === e.target.value);
               setGroupId(e.target.value);
-              setSubgroupId('');
+              setSubgroupId(nextGroup?.subgroups?.[0]?.id || '');
             }}
             className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
-            <option value="">不指定分组</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
@@ -219,7 +236,6 @@ export function UploadCenter() {
               onChange={(e) => setSubgroupId(e.target.value)}
               className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
-              <option value="">不指定二级分组</option>
               {selectedGroup.subgroups.map((subgroup) => (
                 <option key={subgroup.id} value={subgroup.id}>
                   {subgroup.name}
