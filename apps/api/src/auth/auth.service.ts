@@ -54,7 +54,7 @@ export class AuthService {
   }
 
   getTokenPrefix(rawToken: string): string {
-    return rawToken.substring(0, 8);
+    return rawToken.trim().substring(0, 8);
   }
 
   async verifyToken(rawToken: string, hash: string): Promise<boolean> {
@@ -95,55 +95,70 @@ export class AuthService {
   }
 
   async validateToken(rawToken: string) {
-    // 先查缓存
-    const cached = this.cacheGet(rawToken);
-    if (cached) {
-      if (!cached.enabled) {
-        this.cacheDelete(rawToken);
-        return null;
-      }
-      // 仍检查过期时间（缓存中存的是当时的状态）
-      if (cached.expiresAt && new Date(cached.expiresAt) < new Date()) {
-        this.cacheDelete(rawToken);
-        return null;
-      }
-      // 异步更新 lastUsedAt
-      this.prisma.accessToken
-        .update({
-          where: { id: cached.id },
-          data: { lastUsedAt: new Date() },
-        })
-        .catch(() => {});
-      return cached;
-    }
-
-    // 缓存未命中，走 bcrypt 验证
-    const prefix = this.getTokenPrefix(rawToken);
-    const candidates = await this.prisma.accessToken.findMany({
-      where: { tokenPrefix: prefix },
-    });
-
-    for (const candidate of candidates) {
-      const isValid = await this.verifyToken(rawToken, candidate.tokenHash);
-      if (isValid) {
-        if (!candidate.enabled) return null;
-        if (candidate.expiresAt && candidate.expiresAt < new Date()) return null;
-
-        // 缓存验证结果
-        this.cacheSet(rawToken, candidate);
-
+    for (const tokenInput of this.getTokenInputs(rawToken)) {
+      // 先查缓存
+      const cached = this.cacheGet(tokenInput);
+      if (cached) {
+        if (!cached.enabled) {
+          this.cacheDelete(tokenInput);
+          return null;
+        }
+        // 仍检查过期时间（缓存中存的是当时的状态）
+        if (cached.expiresAt && new Date(cached.expiresAt) < new Date()) {
+          this.cacheDelete(tokenInput);
+          return null;
+        }
+        // 异步更新 lastUsedAt
         this.prisma.accessToken
           .update({
-            where: { id: candidate.id },
+            where: { id: cached.id },
             data: { lastUsedAt: new Date() },
           })
           .catch(() => {});
+        return cached;
+      }
 
-        return candidate;
+      // 缓存未命中，走 bcrypt 验证
+      const prefix = this.getTokenPrefix(tokenInput);
+      const candidates = await this.prisma.accessToken.findMany({
+        where: { tokenPrefix: prefix },
+      });
+
+      for (const candidate of candidates) {
+        const isValid = await this.verifyToken(tokenInput, candidate.tokenHash);
+        if (isValid) {
+          if (!candidate.enabled) return null;
+          if (candidate.expiresAt && candidate.expiresAt < new Date()) return null;
+
+          // 缓存验证结果
+          this.cacheSet(tokenInput, candidate);
+
+          this.prisma.accessToken
+            .update({
+              where: { id: candidate.id },
+              data: { lastUsedAt: new Date() },
+            })
+            .catch(() => {});
+
+          return candidate;
+        }
       }
     }
 
     return null;
+  }
+
+  private getTokenInputs(rawToken: string): string[] {
+    const trimmed = rawToken.trim();
+    const inputs = new Set<string>();
+    if (trimmed) inputs.add(trimmed);
+
+    // `npm run db:seed` prints helper labels around generated 64-hex tokens.
+    // Accepting the embedded token makes copy/paste of the full line harmless.
+    const generatedToken = trimmed.match(/[a-fA-F0-9]{64}/)?.[0];
+    if (generatedToken) inputs.add(generatedToken);
+
+    return Array.from(inputs);
   }
 
   async rotateToken(

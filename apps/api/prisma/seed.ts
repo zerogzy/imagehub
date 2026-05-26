@@ -49,6 +49,7 @@ async function main() {
   console.log('');
   console.log('⚠️  SAVE THIS TOKEN NOW - IT WILL NOT BE SHOWN AGAIN:');
   console.log(`🔑 ${rawToken}`);
+  console.log(`ADMIN_TOKEN=${rawToken}`);
   console.log(`📌 Prefix: ${tokenPrefix}`);
   console.log('');
 
@@ -69,6 +70,7 @@ async function main() {
 
   console.log('✅ Visitor token created:');
   console.log(`🔑 ${visitorRawToken}`);
+  console.log(`VISITOR_TOKEN=${visitorRawToken}`);
   console.log(`📌 Prefix: ${visitorTokenPrefix}`);
   console.log('');
 
