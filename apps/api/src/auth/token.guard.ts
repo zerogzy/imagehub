@@ -44,8 +44,10 @@ export class TokenGuard implements CanActivate {
     // Priority 1: Authorization: Bearer <token>
     const authHeader = request.headers['authorization'];
     if (authHeader && typeof authHeader === 'string') {
-      const match = authHeader.match(/^bearer\s+(.+)$/i);
-      if (match) return match[1];
+      const parts = authHeader.split(' ');
+      if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
+        return parts[1];
+      }
     }
 
     // Priority 2: X-ImageHub-Token header
