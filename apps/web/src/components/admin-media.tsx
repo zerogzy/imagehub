@@ -19,6 +19,7 @@ import {
   MoveRight,
   Eye,
   Download,
+  Upload,
 } from 'lucide-react';
 
 interface AdminAsset {
@@ -94,6 +95,10 @@ export function AdminMediaManager() {
   const [moving, setMoving] = useState(false);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dragTarget, setDragTarget] = useState<{ assetId: string; placement: DropPlacement } | null>(null);
+  const [isLocalFileDragging, setIsLocalFileDragging] = useState(false);
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<File[]>([]);
+  const [uploadTargetSubgroupId, setUploadTargetSubgroupId] = useState('');
+  const [uploadingLocalFiles, setUploadingLocalFiles] = useState(false);
   const dragStateRef = useRef<DragState | null>(null);
   const assetsRef = useRef<AdminAsset[]>([]);
   const suppressClickRef = useRef(false);
@@ -457,12 +462,14 @@ export function AdminMediaManager() {
   };
 
   const handleGridDragEvent = (event: DragEvent<HTMLDivElement>) => {
+    if (isFileDragEvent(event)) return;
     if (!acceptAssetDrop(event)) return;
     const assetId = getAssetIdFromPoint(event);
     if (assetId) updateDragTarget(assetId);
   };
 
   const handleGridDrop = async (event: DragEvent<HTMLDivElement>) => {
+    if (isFileDragEvent(event)) return;
     if (!acceptAssetDrop(event)) return;
     const assetId = getAssetIdFromPoint(event);
     if (assetId) {
@@ -470,6 +477,86 @@ export function AdminMediaManager() {
       return;
     }
     clearDragState();
+  };
+
+  const isFileDragEvent = (event: DragEvent<HTMLElement>) => (
+    Array.from(event.dataTransfer.types).includes('Files')
+  );
+
+  const uploadLocalFilesToCurrentGroup = async (files: File[], targetSubgroupId: string) => {
+    if (!token || !groupFilter || files.length === 0) return;
+    setUploadingLocalFiles(true);
+
+    let successCount = 0;
+    let failCount = 0;
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('groupId', groupFilter);
+      if (targetSubgroupId) formData.append('subgroupId', targetSubgroupId);
+
+      try {
+        const res = await fetch('/api/v1/admin/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          failCount += 1;
+        } else {
+          successCount += 1;
+        }
+      } catch {
+        failCount += 1;
+      }
+    }
+
+    setUploadingLocalFiles(false);
+    setPendingUploadFiles([]);
+    setUploadTargetSubgroupId('');
+    if (successCount > 0) showToast('success', `已上传 ${successCount} 个文件到当前分组`);
+    if (failCount > 0) showToast('error', `${failCount} 个文件上传失败`);
+    fetchAssets();
+    fetchGroupsAndTags();
+  };
+
+  const startLocalFileUpload = (files: File[]) => {
+    if (!groupFilter || !currentGroup) {
+      showToast('warning', '请先选择一个具体分组，再拖入本地文件上传');
+      return;
+    }
+
+    if (currentGroup.subgroups && currentGroup.subgroups.length > 0) {
+      setPendingUploadFiles(files);
+      setUploadTargetSubgroupId(subgroupFilter === ROOT_SUBGROUP_VALUE ? '' : subgroupFilter);
+      return;
+    }
+
+    uploadLocalFilesToCurrentGroup(files, '');
+  };
+
+  const handleLocalFileDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!isFileDragEvent(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = groupFilter ? 'copy' : 'none';
+    setIsLocalFileDragging(true);
+  };
+
+  const handleLocalFileDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (!isFileDragEvent(event)) return;
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && event.currentTarget.contains(nextTarget)) return;
+    setIsLocalFileDragging(false);
+  };
+
+  const handleLocalFileDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!isFileDragEvent(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setIsLocalFileDragging(false);
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length > 0) startLocalFileUpload(files);
   };
 
 
@@ -719,7 +806,27 @@ export function AdminMediaManager() {
   };
 
   return (
-    <div>
+    <div
+      onDragOver={handleLocalFileDragOver}
+      onDragLeave={handleLocalFileDragLeave}
+      onDrop={handleLocalFileDrop}
+      className="relative min-h-[70vh]"
+    >
+      {isLocalFileDragging && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-primary/10 backdrop-blur-[1px]">
+          <div className="rounded-2xl border-2 border-dashed border-primary bg-white px-8 py-6 text-center shadow-xl">
+            <Upload className="mx-auto mb-3 h-8 w-8 text-primary" />
+            <p className="text-sm font-semibold text-text-primary">
+              {groupFilter ? '松开后上传到当前分组' : '请先选择具体分组'}
+            </p>
+            <p className="mt-1 text-xs text-text-muted">
+              {currentGroup?.subgroups?.length
+                ? '当前分组有二级分组，松开后需要选择上传位置'
+                : '仅在非“全部分组”视图支持拖入上传'}
+            </p>
+          </div>
+        </div>
+      )}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">媒体管理</h1>
@@ -961,6 +1068,68 @@ export function AdminMediaManager() {
               >
                 {moving ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoveRight className="h-4 w-4" />}
                 移动
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingUploadFiles.length > 0 && currentGroup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">选择上传分组</h2>
+                <p className="mt-0.5 text-xs text-text-muted">
+                  将 {pendingUploadFiles.length} 个文件上传到「{currentGroup.name}」
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (uploadingLocalFiles) return;
+                  setPendingUploadFiles([]);
+                  setUploadTargetSubgroupId('');
+                }}
+                className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-background-secondary hover:text-text-primary"
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-4 px-5 py-4">
+              <label className="block text-sm font-medium text-text-primary">
+                二级分组
+                <select
+                  value={uploadTargetSubgroupId}
+                  onChange={(e) => setUploadTargetSubgroupId(e.target.value)}
+                  disabled={uploadingLocalFiles}
+                  className="mt-2 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                >
+                  <option value="">不指定二级分组</option>
+                  {currentGroup.subgroups?.map((subgroup) => (
+                    <option key={subgroup.id} value={subgroup.id}>{subgroup.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+              <button
+                onClick={() => {
+                  setPendingUploadFiles([]);
+                  setUploadTargetSubgroupId('');
+                }}
+                disabled={uploadingLocalFiles}
+                className="rounded-lg border border-border px-4 py-2 text-sm text-text-secondary transition-colors hover:bg-background-secondary disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => uploadLocalFilesToCurrentGroup(pendingUploadFiles, uploadTargetSubgroupId)}
+                disabled={uploadingLocalFiles}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {uploadingLocalFiles ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                上传
               </button>
             </div>
           </div>

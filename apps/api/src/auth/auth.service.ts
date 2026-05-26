@@ -41,6 +41,14 @@ export class AuthService {
     this.tokenCache.delete(rawToken);
   }
 
+  private cacheDeleteByTokenId(tokenId: string) {
+    for (const [rawToken, entry] of this.tokenCache.entries()) {
+      if (entry.token?.id === tokenId) {
+        this.tokenCache.delete(rawToken);
+      }
+    }
+  }
+
   async hashToken(rawToken: string): Promise<string> {
     return bcrypt.hash(rawToken, 12);
   }
@@ -90,6 +98,10 @@ export class AuthService {
     // 先查缓存
     const cached = this.cacheGet(rawToken);
     if (cached) {
+      if (!cached.enabled) {
+        this.cacheDelete(rawToken);
+        return null;
+      }
       // 仍检查过期时间（缓存中存的是当时的状态）
       if (cached.expiresAt && new Date(cached.expiresAt) < new Date()) {
         this.cacheDelete(rawToken);
@@ -142,6 +154,7 @@ export class AuthService {
     });
 
     if (!token) return null;
+    this.cacheDeleteByTokenId(tokenId);
 
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = await this.hashToken(rawToken);
@@ -210,7 +223,7 @@ export class AuthService {
         createdAt: true,
         updatedAt: true,
       },
-    });
+    }).finally(() => this.cacheDeleteByTokenId(tokenId));
   }
 
   async deleteToken(tokenId: string) {
@@ -232,7 +245,7 @@ export class AuthService {
 
     return this.prisma.accessToken.delete({
       where: { id: tokenId },
-    });
+    }).finally(() => this.cacheDeleteByTokenId(tokenId));
   }
 
   async getToken(tokenId: string) {

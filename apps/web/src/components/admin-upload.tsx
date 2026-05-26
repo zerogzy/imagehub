@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { apiFetch, formatFileSize } from '@/lib/utils';
 import { showToast } from '@/lib/toast';
@@ -26,21 +26,29 @@ interface UploadingFile {
   result?: { id: string; originalFilename: string; mediaType: string };
 }
 
+interface UploadGroup {
+  id: string;
+  name: string;
+  subgroups?: { id: string; name: string }[];
+}
+
 export function UploadCenter() {
   const [files, setFiles] = useState<UploadingFile[]>([]);
   const [groupId, setGroupId] = useState<string>('');
-  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
+  const [subgroupId, setSubgroupId] = useState<string>('');
+  const [groups, setGroups] = useState<UploadGroup[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = useAuthStore((s) => s.token);
+  const selectedGroup = groups.find((group) => group.id === groupId);
 
   // Load groups on mount
-  useState(() => {
+  useEffect(() => {
     if (!token) return;
-    apiFetch<{ id: string; name: string }[]>('/groups', token).then((result) => {
-      if (result.data) setGroups(result.data as any);
+    apiFetch<UploadGroup[]>('/groups', token).then((result) => {
+      if (result.data) setGroups(result.data);
     });
-  });
+  }, [token]);
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const uploadingFiles: UploadingFile[] = Array.from(newFiles).map((file) => ({
@@ -67,6 +75,7 @@ export function UploadCenter() {
       const formData = new FormData();
       formData.append('file', uploadingFile.file);
       if (groupId) formData.append('groupId', groupId);
+      if (groupId && subgroupId) formData.append('subgroupId', subgroupId);
 
       try {
         const res = await fetch('/api/v1/admin/upload', {
@@ -122,7 +131,7 @@ export function UploadCenter() {
         );
       }
     },
-    [token, groupId],
+    [token, groupId, subgroupId],
   );
 
   const uploadAll = useCallback(() => {
@@ -191,7 +200,10 @@ export function UploadCenter() {
           <label className="text-sm font-medium text-text-secondary">上传到分组：</label>
           <select
             value={groupId}
-            onChange={(e) => setGroupId(e.target.value)}
+            onChange={(e) => {
+              setGroupId(e.target.value);
+              setSubgroupId('');
+            }}
             className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <option value="">不指定分组</option>
@@ -201,6 +213,20 @@ export function UploadCenter() {
               </option>
             ))}
           </select>
+          {selectedGroup?.subgroups && selectedGroup.subgroups.length > 0 && (
+            <select
+              value={subgroupId}
+              onChange={(e) => setSubgroupId(e.target.value)}
+              className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="">不指定二级分组</option>
+              {selectedGroup.subgroups.map((subgroup) => (
+                <option key={subgroup.id} value={subgroup.id}>
+                  {subgroup.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       )}
 

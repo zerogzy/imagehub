@@ -23,26 +23,46 @@ export class UploadController {
    */
   @Post()
   async uploadFile(@Request() req: FastifyRequest) {
-    const data = await (req as any).file();
-    if (!data) {
+    const parts = (req as any).parts();
+    let uploadedFile: any = null;
+    let groupId: string | undefined;
+    let subgroupId: string | undefined;
+
+    for await (const part of parts) {
+      if (part.type === 'file' && !uploadedFile) {
+        const buffer = await part.toBuffer();
+        uploadedFile = {
+          fieldname: part.fieldname,
+          originalname: part.filename,
+          encoding: part.encoding,
+          mimetype: part.mimetype,
+          buffer,
+          size: buffer.length,
+        };
+        continue;
+      }
+
+      if (part.type === 'field') {
+        if (part.fieldname === 'groupId') groupId = String(part.value || '') || undefined;
+        if (part.fieldname === 'subgroupId') {
+          subgroupId = String(part.value || '') || undefined;
+        }
+      }
+    }
+
+    if (!uploadedFile) {
       return {
         success: false,
         error: { code: 'NO_FILE', message: 'No file uploaded' },
       };
     }
 
-    const buffer = await data.toBuffer();
     const tokenId = (req as any).token.id;
 
     const result = await this.uploadService.processUploadedFile({
-      file: {
-        fieldname: data.fieldname,
-        originalname: data.filename,
-        encoding: data.encoding,
-        mimetype: data.mimetype,
-        buffer,
-        size: buffer.length,
-      },
+      file: uploadedFile,
+      groupId,
+      subgroupId,
       tokenId,
     });
 
@@ -54,21 +74,39 @@ export class UploadController {
    */
   @Post('batch')
   async uploadBatch(@Request() req: FastifyRequest) {
-    const parts = (req as any).files();
+    const parts = (req as any).parts();
     const results = [];
     const tokenId = (req as any).token.id;
+    const files = [];
+    let groupId: string | undefined;
+    let subgroupId: string | undefined;
 
-    for await (const data of parts) {
-      const buffer = await data.toBuffer();
+    for await (const part of parts) {
+      if (part.type === 'field') {
+        if (part.fieldname === 'groupId') groupId = String(part.value || '') || undefined;
+        if (part.fieldname === 'subgroupId') {
+          subgroupId = String(part.value || '') || undefined;
+        }
+        continue;
+      }
+
+      if (part.type !== 'file') continue;
+      const buffer = await part.toBuffer();
+      files.push({
+        fieldname: part.fieldname,
+        originalname: part.filename,
+        encoding: part.encoding,
+        mimetype: part.mimetype,
+        buffer,
+        size: buffer.length,
+      });
+    }
+
+    for (const file of files) {
       const result = await this.uploadService.processUploadedFile({
-        file: {
-          fieldname: data.fieldname,
-          originalname: data.filename,
-          encoding: data.encoding,
-          mimetype: data.mimetype,
-          buffer,
-          size: buffer.length,
-        },
+        file,
+        groupId,
+        subgroupId,
         tokenId,
       });
       results.push(result);
