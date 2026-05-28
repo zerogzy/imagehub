@@ -1,51 +1,29 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
-import { apiFetch, slugify, cn } from '@/lib/utils';
+import { apiFetch, slugify } from '@/lib/utils';
 import { showToast } from '@/lib/toast';
+import { Plus, FolderOpen, Loader2 } from 'lucide-react';
 import {
-  Plus,
-  FolderOpen,
-  Trash2,
-  Edit3,
-  Shuffle,
-  ChevronRight,
-  X,
-  Check,
-  GripVertical,
-  Loader2,
-  FolderPlus,
-} from 'lucide-react';
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableGroupRow, AdminGroup, AdminSubgroup } from './admin-group-row';
+import { AdminGroupModal, GroupFormData } from './admin-group-modal';
 
-interface Subgroup {
-  id: string;
-  name: string;
-  description?: string;
-  rankKey: string;
-  _count?: { groupAssets: number };
-}
-
-interface Group {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  rankKey: string;
-  randomEnabled: boolean;
-  randomRotateInterval?: number | null;
-  currentSeed?: string | null;
-  _count: { groupAssets: number; subgroups: number };
-  subgroups?: Subgroup[];
-}
-
-interface GroupFormData {
-  name: string;
-  slug: string;
-  description: string;
-  randomEnabled: boolean;
-  randomRotateInterval: number | null;
-}
+const DEFAULT_GROUP_SLUG = 'default';
 
 const emptyForm: GroupFormData = {
   name: '',
@@ -56,26 +34,30 @@ const emptyForm: GroupFormData = {
 };
 
 export function AdminGroupManager() {
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<AdminGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [editingGroup, setEditingGroup] = useState<AdminGroup | null>(null);
   const [form, setForm] = useState<GroupFormData>(emptyForm);
   const [creatingSubgroupFor, setCreatingSubgroupFor] = useState<string | null>(null);
   const [subgroupName, setSubgroupName] = useState('');
 
   const token = useAuthStore((s) => s.token);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   const fetchGroups = useCallback(async () => {
     if (!token) return;
     setLoading(true);
-    const result = await apiFetch<Group[]>('/groups', token);
+    const result = await apiFetch<AdminGroup[]>('/groups', token);
     if (result.data) {
-      // Load subgroups for each group
       const groupsWithSubs = await Promise.all(
         (result.data as any[]).map(async (g) => {
-          const subResult = await apiFetch<Subgroup[]>(`/groups/${g.id}/subgroups`, token!);
+          const subResult = await apiFetch<AdminSubgroup[]>(`/groups/${g.id}/subgroups`, token!);
           return { ...g, subgroups: subResult.data || [] };
         }),
       );
@@ -88,9 +70,43 @@ export function AdminGroupManager() {
     fetchGroups();
   }, [fetchGroups]);
 
+  const orderedIds = useMemo(() => groups.map((g) => g.id), [groups]);
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !token) return;
+
+    const oldIndex = groups.findIndex((g) => g.id === active.id);
+    const newIndex = groups.findIndex((g) => g.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const defaultIndex = groups.findIndex((g) => g.slug === DEFAULT_GROUP_SLUG);
+    if (defaultIndex !== -1 && (oldIndex === defaultIndex || newIndex === defaultIndex)) {
+      showToast('error', '默认分组位置固定，无法调整');
+      return;
+    }
+
+    const previousOrder = groups;
+    const reordered = arrayMove(groups, oldIndex, newIndex);
+    setGroups(reordered);
+
+    const result = await apiFetch('/admin/groups/reorder', token, {
+      method: 'POST',
+      body: JSON.stringify({ orderedIds: reordered.map((g) => g.id) }),
+    });
+
+    if (result.error) {
+      showToast('error', result.error);
+      setGroups(previousOrder);
+      return;
+    }
+
+    showToast('success', '分组顺序已更新');
+    fetchGroups();
+  };
+
   const handleCreateGroup = async () => {
     if (!token || !form.name.trim()) return;
-
     const result = await apiFetch('/admin/groups', token, {
       method: 'POST',
       body: JSON.stringify({
@@ -101,12 +117,7 @@ export function AdminGroupManager() {
         randomRotateInterval: form.randomRotateInterval || undefined,
       }),
     });
-
-    if (result.error) {
-      showToast('error', result.error);
-      return;
-    }
-
+    if (result.error) { showToast('error', result.error); return; }
     showToast('success', '分组创建成功');
     setShowCreateModal(false);
     setForm(emptyForm);
@@ -115,7 +126,6 @@ export function AdminGroupManager() {
 
   const handleUpdateGroup = async () => {
     if (!token || !editingGroup) return;
-
     const result = await apiFetch(`/admin/groups/${editingGroup.id}`, token, {
       method: 'PATCH',
       body: JSON.stringify({
@@ -126,12 +136,7 @@ export function AdminGroupManager() {
         randomRotateInterval: form.randomRotateInterval || undefined,
       }),
     });
-
-    if (result.error) {
-      showToast('error', result.error);
-      return;
-    }
-
+    if (result.error) { showToast('error', result.error); return; }
     showToast('success', '分组更新成功');
     setEditingGroup(null);
     setForm(emptyForm);
@@ -141,36 +146,19 @@ export function AdminGroupManager() {
   const handleDeleteGroup = async (groupId: string) => {
     if (!token) return;
     if (!confirm('确定要删除此分组吗？分组内的图片不会被删除。')) return;
-
-    const result = await apiFetch(`/admin/groups/${groupId}`, token, {
-      method: 'DELETE',
-    });
-
-    if (result.error) {
-      showToast('error', result.error);
-      return;
-    }
-
+    const result = await apiFetch(`/admin/groups/${groupId}`, token, { method: 'DELETE' });
+    if (result.error) { showToast('error', result.error); return; }
     showToast('success', '分组已删除');
     fetchGroups();
   };
 
   const handleCreateSubgroup = async (groupId: string) => {
     if (!token || !subgroupName.trim()) return;
-
     const result = await apiFetch('/admin/subgroups', token, {
       method: 'POST',
-      body: JSON.stringify({
-        groupId,
-        name: subgroupName.trim(),
-      }),
+      body: JSON.stringify({ groupId, name: subgroupName.trim() }),
     });
-
-    if (result.error) {
-      showToast('error', result.error);
-      return;
-    }
-
+    if (result.error) { showToast('error', result.error); return; }
     showToast('success', '二级分组创建成功');
     setCreatingSubgroupFor(null);
     setSubgroupName('');
@@ -180,16 +168,8 @@ export function AdminGroupManager() {
   const handleDeleteSubgroup = async (subgroupId: string) => {
     if (!token) return;
     if (!confirm('确定要删除此二级分组吗？')) return;
-
-    const result = await apiFetch(`/admin/subgroups/${subgroupId}`, token, {
-      method: 'DELETE',
-    });
-
-    if (result.error) {
-      showToast('error', result.error);
-      return;
-    }
-
+    const result = await apiFetch(`/admin/subgroups/${subgroupId}`, token, { method: 'DELETE' });
+    if (result.error) { showToast('error', result.error); return; }
     showToast('success', '二级分组已删除');
     fetchGroups();
   };
@@ -203,7 +183,7 @@ export function AdminGroupManager() {
     });
   };
 
-  const openEditModal = (group: Group) => {
+  const openEditModal = (group: AdminGroup) => {
     setEditingGroup(group);
     setForm({
       name: group.name,
@@ -212,6 +192,11 @@ export function AdminGroupManager() {
       randomEnabled: group.randomEnabled,
       randomRotateInterval: group.randomRotateInterval ?? null,
     });
+  };
+
+  const closeModal = () => {
+    setShowCreateModal(false);
+    setEditingGroup(null);
   };
 
   if (loading) {
@@ -228,7 +213,7 @@ export function AdminGroupManager() {
         <div>
           <h1 className="text-xl font-bold text-text-primary">分组管理</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            管理图片分组和二级分组，支持随机轮换设置
+            拖动左侧手柄调整分组顺序，图片广场会同步该顺序
           </p>
         </div>
         <button
@@ -240,248 +225,45 @@ export function AdminGroupManager() {
         </button>
       </div>
 
-      {/* Group list */}
-      <div className="space-y-2">
-        {groups.map((group) => (
-          <div key={group.id} className="rounded-xl border border-border bg-white">
-            {/* Group header */}
-            <div className="flex items-center gap-3 p-4">
-              <button
-                onClick={() => toggleExpand(group.id)}
-                className="rounded p-0.5 text-text-muted hover:bg-background-secondary transition-colors"
-                aria-label={expandedGroups.has(group.id) ? '收起' : '展开'}
-              >
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 transition-transform',
-                    expandedGroups.has(group.id) ? 'rotate-90' : '',
-                  )}
-                />
-              </button>
-
-              <FolderOpen className="h-5 w-5 text-primary" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-text-primary">{group.name}</span>
-                  {group.randomEnabled && (
-                    <span className="flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                      <Shuffle className="h-2.5 w-2.5" />
-                      随机
-                      {group.randomRotateInterval && ` ${group.randomRotateInterval}分钟`}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-text-muted">
-                  {group._count.groupAssets} 张图片
-                  {group._count.subgroups > 0 && ` · ${group._count.subgroups} 个二级分组`}
-                  {group.slug && ` · ${group.slug}`}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCreatingSubgroupFor(group.id)}
-                  className="rounded-lg p-2 text-text-muted hover:bg-primary/10 hover:text-primary transition-colors"
-                  title="添加二级分组"
-                  aria-label="添加二级分组"
-                >
-                  <FolderPlus className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => openEditModal(group)}
-                  className="rounded-lg p-2 text-text-muted hover:bg-primary/10 hover:text-primary transition-colors"
-                  title="编辑"
-                  aria-label="编辑分组"
-                >
-                  <Edit3 className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleDeleteGroup(group.id)}
-                  className="rounded-lg p-2 text-text-muted hover:bg-danger/10 hover:text-danger transition-colors"
-                  title="删除"
-                  aria-label="删除分组"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Subgroups */}
-            {expandedGroups.has(group.id) && group.subgroups && group.subgroups.length > 0 && (
-              <div className="border-t border-border px-4 py-2">
-                {group.subgroups.map((sub) => (
-                  <div
-                    key={sub.id}
-                    className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-background-secondary transition-colors"
-                  >
-                    <FolderOpen className="h-4 w-4 text-text-muted" />
-                    <span className="flex-1 text-sm text-text-primary">{sub.name}</span>
-                    <span className="text-xs text-text-muted">
-                      {sub._count?.groupAssets ?? 0} 张
-                    </span>
-                    <button
-                      onClick={() => handleDeleteSubgroup(sub.id)}
-                      className="rounded p-1 text-text-muted hover:text-danger transition-colors"
-                      aria-label="删除二级分组"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Create subgroup inline */}
-            {creatingSubgroupFor === group.id && (
-              <div className="border-t border-border px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={subgroupName}
-                    onChange={(e) => setSubgroupName(e.target.value)}
-                    placeholder="二级分组名称"
-                    className="h-8 flex-1 rounded-md border border-border px-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleCreateSubgroup(group.id);
-                      if (e.key === 'Escape') { setCreatingSubgroupFor(null); setSubgroupName(''); }
-                    }}
-                  />
-                  <button
-                    onClick={() => handleCreateSubgroup(group.id)}
-                    className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover transition-colors"
-                  >
-                    <Check className="h-3 w-3" />
-                    创建
-                  </button>
-                  <button
-                    onClick={() => { setCreatingSubgroupFor(null); setSubgroupName(''); }}
-                    className="rounded-md px-2 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
-                  >
-                    取消
-                  </button>
-                </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
+          <div className="space-y-2">
+            {groups.map((group) => (
+              <SortableGroupRow
+                key={group.id}
+                group={group}
+                isExpanded={expandedGroups.has(group.id)}
+                disableDrag={group.slug === DEFAULT_GROUP_SLUG}
+                creatingSubgroupFor={creatingSubgroupFor}
+                subgroupName={subgroupName}
+                onToggleExpand={toggleExpand}
+                onStartCreateSubgroup={setCreatingSubgroupFor}
+                onEditGroup={openEditModal}
+                onDeleteGroup={handleDeleteGroup}
+                onConfirmCreateSubgroup={handleCreateSubgroup}
+                onCancelCreateSubgroup={() => { setCreatingSubgroupFor(null); setSubgroupName(''); }}
+                onSubgroupNameChange={setSubgroupName}
+                onDeleteSubgroup={handleDeleteSubgroup}
+              />
+            ))}
+            {groups.length === 0 && (
+              <div className="rounded-xl border border-dashed border-border p-12 text-center">
+                <FolderOpen className="mx-auto mb-3 h-10 w-10 text-text-muted" />
+                <p className="text-sm text-text-muted">暂无分组，点击右上角创建</p>
               </div>
             )}
           </div>
-        ))}
+        </SortableContext>
+      </DndContext>
 
-        {groups.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border p-12 text-center">
-            <FolderOpen className="mx-auto mb-3 h-10 w-10 text-text-muted" />
-            <p className="text-sm text-text-muted">暂无分组，点击右上角创建</p>
-          </div>
-        )}
-      </div>
-
-      {/* Create/Edit Group Modal */}
       {(showCreateModal || editingGroup) && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) { setShowCreateModal(false); setEditingGroup(null); } }}
-        >
-          <div className="w-full max-w-md animate-scale-in rounded-2xl bg-white p-6 shadow-modal">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-text-primary">
-                {editingGroup ? '编辑分组' : '新建分组'}
-              </h2>
-              <button
-                onClick={() => { setShowCreateModal(false); setEditingGroup(null); }}
-                className="rounded-lg p-1.5 text-text-muted hover:bg-background-secondary transition-colors"
-                aria-label="关闭"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text-primary">
-                  分组名称 <span className="text-danger">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.name}
-                  onChange={(e) => {
-                    setForm({ ...form, name: e.target.value, slug: slugify(e.target.value) });
-                  }}
-                  placeholder="输入分组名称"
-                  className="h-10 w-full rounded-lg border border-border px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text-primary">
-                  Slug
-                </label>
-                <input
-                  type="text"
-                  value={form.slug}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                  placeholder="url-friendly-name"
-                  className="h-10 w-full rounded-lg border border-border px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text-primary">
-                  描述
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="可选描述"
-                  rows={2}
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-
-              <div className="flex items-center gap-3">
-                <label className="relative flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={form.randomEnabled}
-                    onChange={(e) => setForm({ ...form, randomEnabled: e.target.checked })}
-                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-text-primary">启用随机轮换</span>
-                </label>
-              </div>
-
-              {form.randomEnabled && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-text-primary">
-                    轮换间隔（分钟）
-                  </label>
-                  <input
-                    type="number"
-                    value={form.randomRotateInterval ?? ''}
-                    onChange={(e) => setForm({ ...form, randomRotateInterval: e.target.value ? parseInt(e.target.value) : null })}
-                    placeholder="60"
-                    className="h-10 w-full rounded-lg border border-border px-3 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                onClick={() => { setShowCreateModal(false); setEditingGroup(null); }}
-                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary hover:bg-background-secondary transition-colors"
-              >
-                取消
-              </button>
-              <button
-                onClick={editingGroup ? handleUpdateGroup : handleCreateGroup}
-                disabled={!form.name.trim()}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {editingGroup ? '保存' : '创建'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AdminGroupModal
+          mode={editingGroup ? 'edit' : 'create'}
+          form={form}
+          onFormChange={setForm}
+          onClose={closeModal}
+          onSubmit={editingGroup ? handleUpdateGroup : handleCreateGroup}
+        />
       )}
     </div>
   );
