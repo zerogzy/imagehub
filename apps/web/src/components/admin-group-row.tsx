@@ -40,6 +40,7 @@ interface SortableGroupRowProps {
   group: AdminGroup;
   isExpanded: boolean;
   disableDrag: boolean;
+  isDefaultGroup?: boolean;
   creatingSubgroupFor: string | null;
   subgroupName: string;
   editingSubgroupId: string | null;
@@ -62,6 +63,7 @@ export function SortableGroupRow({
   group,
   isExpanded,
   disableDrag,
+  isDefaultGroup = false,
   creatingSubgroupFor,
   subgroupName,
   editingSubgroupId,
@@ -170,14 +172,26 @@ export function SortableGroupRow({
           >
             <Edit3 className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => onDeleteGroup(group.id)}
-            className="rounded-lg p-2 text-text-muted hover:bg-danger/10 hover:text-danger transition-colors"
-            title="删除"
-            aria-label="删除分组"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {isDefaultGroup ? (
+            <button
+              type="button"
+              disabled
+              className="cursor-not-allowed rounded-lg p-2 text-text-muted/40"
+              title="默认分组不可删除"
+              aria-label="默认分组不可删除"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              onClick={() => onDeleteGroup(group.id)}
+              className="rounded-lg p-2 text-text-muted hover:bg-danger/10 hover:text-danger transition-colors"
+              title="删除"
+              aria-label="删除分组"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 

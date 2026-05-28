@@ -173,9 +173,64 @@ export class GroupService {
   }
 
   async deleteGroup(groupId: string) {
-    return this.prisma.group.delete({
+    const target = await this.prisma.group.findUnique({
       where: { id: groupId },
+      select: { id: true, slug: true, name: true },
     });
+    if (!target) {
+      throw new BadRequestException('分组不存在');
+    }
+    if (this.isDefaultGroup(target)) {
+      throw new BadRequestException('默认分组不可删除');
+    }
+
+    const { group: defaultGroup, subgroup: defaultSubgroup } = await this.ensureDefaultHierarchy();
+    if (defaultGroup.id === groupId) {
+      throw new BadRequestException('默认分组不可删除');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const groupAssets = await tx.groupAsset.findMany({
+        where: { groupId },
+        select: { id: true, assetId: true },
+      });
+
+      if (groupAssets.length > 0) {
+        const assetIds = groupAssets.map((ga) => ga.assetId);
+        const existingInDefault = await tx.groupAsset.findMany({
+          where: { groupId: defaultGroup.id, assetId: { in: assetIds } },
+          select: { assetId: true },
+        });
+        const existingSet = new Set(existingInDefault.map((ga) => ga.assetId));
+        const toMigrate = groupAssets.filter((ga) => !existingSet.has(ga.assetId));
+
+        if (toMigrate.length > 0) {
+          const lastAsset = await tx.groupAsset.findFirst({
+            where: { groupId: defaultGroup.id },
+            orderBy: { rankKey: 'desc' },
+            select: { rankKey: true },
+          });
+          let nextRank = lastAsset ? parseInt(lastAsset.rankKey, 36) + 1 : 1;
+          for (const ga of toMigrate) {
+            await tx.groupAsset.update({
+              where: { id: ga.id },
+              data: {
+                groupId: defaultGroup.id,
+                subgroupId: defaultSubgroup.id,
+                rankKey: nextRank.toString(36),
+              },
+            });
+            nextRank += 1;
+          }
+        }
+      }
+
+      return tx.group.delete({ where: { id: groupId } });
+    });
+  }
+
+  private isDefaultGroup(group: { slug?: string | null; name?: string | null }) {
+    return group.slug === this.DEFAULT_SLUG || group.name === this.DEFAULT_NAME;
   }
 
   async reorderGroups(orderedIds: string[]) {

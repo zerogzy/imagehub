@@ -157,10 +157,15 @@ export function AdminGroupManager() {
 
   const handleDeleteGroup = async (groupId: string) => {
     if (!token) return;
-    if (!confirm('确定要删除此分组吗？分组内的图片不会被删除。')) return;
+    const target = groups.find((g) => g.id === groupId);
+    if (target?.slug === DEFAULT_GROUP_SLUG) {
+      showToast('error', '默认分组不可删除');
+      return;
+    }
+    if (!confirm('确定要删除此分组吗？分组内的图片将自动移动到默认分组。')) return;
     const result = await apiFetch(`/admin/groups/${groupId}`, token, { method: 'DELETE' });
     if (result.error) { showToast('error', result.error); return; }
-    showToast('success', '分组已删除');
+    showToast('success', '分组已删除，图片已移动到默认分组');
     fetchGroups();
   };
 
@@ -279,6 +284,7 @@ export function AdminGroupManager() {
                 group={group}
                 isExpanded={expandedGroups.has(group.id)}
                 disableDrag={group.slug === DEFAULT_GROUP_SLUG}
+                isDefaultGroup={group.slug === DEFAULT_GROUP_SLUG}
                 creatingSubgroupFor={creatingSubgroupFor}
                 subgroupName={subgroupName}
                 editingSubgroupId={editingSubgroupId}
