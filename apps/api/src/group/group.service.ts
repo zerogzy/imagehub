@@ -1,14 +1,18 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SubgroupService } from './subgroup.service';
+import {
+  DEFAULT_GROUP_NAME,
+  DEFAULT_GROUP_SLUG,
+  uniqueGroupSlug,
+} from './group-slug.helper';
 
 @Injectable()
 export class GroupService {
-  constructor(private prisma: PrismaService) {}
-  private readonly DEFAULT_NAME = '默认';
-  private readonly DEFAULT_SLUG = 'default';
-  private readonly RANK_WIDTH = 12;
-  private readonly RANK_RADIX = 36n;
-  private readonly RANK_MAX = this.RANK_RADIX ** BigInt(this.RANK_WIDTH) - 1n;
+  constructor(
+    private prisma: PrismaService,
+    private subgroupService: SubgroupService,
+  ) {}
 
   async listGroups() {
     await this.ensureDefaultHierarchy();
@@ -65,7 +69,7 @@ export class GroupService {
       const group = await tx.group.create({
         data: {
           name: data.name,
-          slug: await this.uniqueGroupSlug(data.slug || data.name, tx),
+          slug: await uniqueGroupSlug(data.slug || data.name, tx),
           description: data.description,
           rankKey,
           randomEnabled: data.randomEnabled || false,
@@ -76,73 +80,12 @@ export class GroupService {
       await tx.subgroup.create({
         data: {
           groupId: group.id,
-          name: this.DEFAULT_NAME,
+          name: DEFAULT_GROUP_NAME,
           rankKey: '1',
         },
       });
 
       return group;
-    });
-  }
-
-  async ensureDefaultHierarchy() {
-    return this.prisma.$transaction(async (tx) => {
-      let group = await tx.group.findFirst({
-        where: {
-          OR: [
-            { slug: this.DEFAULT_SLUG },
-            { name: this.DEFAULT_NAME },
-          ],
-        },
-        include: { subgroups: { orderBy: { rankKey: 'asc' } } },
-      });
-
-      if (group) {
-        group = await tx.group.update({
-          where: { id: group.id },
-          data: {
-            name: this.DEFAULT_NAME,
-            rankKey: '0',
-          },
-          include: { subgroups: { orderBy: { rankKey: 'asc' } } },
-        });
-      } else {
-        group = await tx.group.create({
-          data: {
-            name: this.DEFAULT_NAME,
-            slug: await this.uniqueGroupSlug(this.DEFAULT_SLUG, tx),
-            rankKey: '0',
-          },
-          include: { subgroups: { orderBy: { rankKey: 'asc' } } },
-        });
-      }
-
-      const existingDefaultSubgroup = group.subgroups.find((subgroup) => subgroup.name === this.DEFAULT_NAME);
-      const defaultSubgroup = existingDefaultSubgroup || await tx.subgroup.create({
-        data: {
-          groupId: group.id,
-          name: this.DEFAULT_NAME,
-          rankKey: '1',
-        },
-      });
-
-      return { group, subgroup: defaultSubgroup };
-    });
-  }
-
-  async ensureDefaultSubgroup(groupId: string) {
-    const existing = await this.prisma.subgroup.findFirst({
-      where: { groupId, name: this.DEFAULT_NAME },
-      orderBy: { rankKey: 'asc' },
-    });
-    if (existing) return existing;
-
-    return this.prisma.subgroup.create({
-      data: {
-        groupId,
-        name: this.DEFAULT_NAME,
-        rankKey: '1',
-      },
     });
   }
 
@@ -229,10 +172,6 @@ export class GroupService {
     });
   }
 
-  private isDefaultGroup(group: { slug?: string | null; name?: string | null }) {
-    return group.slug === this.DEFAULT_SLUG || group.name === this.DEFAULT_NAME;
-  }
-
   async reorderGroups(orderedIds: string[]) {
     const updates = orderedIds.map((id, index) =>
       this.prisma.group.update({
@@ -243,292 +182,60 @@ export class GroupService {
     return Promise.all(updates);
   }
 
-  // ---- Subgroups ----
-
-  async listSubgroups(groupId: string) {
-    return this.prisma.subgroup.findMany({
-      where: { groupId },
-      orderBy: { rankKey: 'asc' },
-      include: {
-        _count: { select: { groupAssets: true } },
-      },
-    });
-  }
-
-  async createSubgroup(data: {
-    groupId: string;
-    name: string;
-    description?: string | null;
-  }) {
-    const trimmedName = data.name.trim();
-    const existing = await this.prisma.subgroup.findFirst({
-      where: { groupId: data.groupId, name: trimmedName },
-      select: { id: true },
-    });
-    if (existing) {
-      throw new BadRequestException(`该分组下已存在名为 "${trimmedName}" 的二级分组`);
-    }
-
-    const lastSub = await this.prisma.subgroup.findFirst({
-      where: { groupId: data.groupId },
-      orderBy: { rankKey: 'desc' },
-      select: { rankKey: true },
-    });
-
-    const rankKey = lastSub
-      ? (parseInt(lastSub.rankKey, 36) + 1).toString(36)
-      : '1';
-
-    return this.prisma.subgroup.create({
-      data: {
-        groupId: data.groupId,
-        name: data.name,
-        description: data.description,
-        rankKey,
-      },
-    });
-  }
-
-  async updateSubgroup(
-    subgroupId: string,
-    data: { name?: string; description?: string },
-  ) {
-    if (data.name !== undefined) {
-      const trimmedName = data.name.trim();
-      const subgroup = await this.prisma.subgroup.findUnique({
-        where: { id: subgroupId },
-        select: { groupId: true },
+  async ensureDefaultHierarchy() {
+    return this.prisma.$transaction(async (tx) => {
+      let group = await tx.group.findFirst({
+        where: {
+          OR: [
+            { slug: DEFAULT_GROUP_SLUG },
+            { name: DEFAULT_GROUP_NAME },
+          ],
+        },
+        include: { subgroups: { orderBy: { rankKey: 'asc' } } },
       });
-      if (subgroup) {
-        const existing = await this.prisma.subgroup.findFirst({
-          where: { groupId: subgroup.groupId, name: trimmedName, id: { not: subgroupId } },
-          select: { id: true },
+
+      if (group) {
+        group = await tx.group.update({
+          where: { id: group.id },
+          data: {
+            name: DEFAULT_GROUP_NAME,
+            rankKey: '0',
+          },
+          include: { subgroups: { orderBy: { rankKey: 'asc' } } },
         });
-        if (existing) {
-          throw new BadRequestException(`该分组下已存在名为 "${trimmedName}" 的二级分组`);
-        }
+      } else {
+        group = await tx.group.create({
+          data: {
+            name: DEFAULT_GROUP_NAME,
+            slug: await uniqueGroupSlug(DEFAULT_GROUP_SLUG, tx),
+            rankKey: '0',
+          },
+          include: { subgroups: { orderBy: { rankKey: 'asc' } } },
+        });
       }
-    }
-    return this.prisma.subgroup.update({
-      where: { id: subgroupId },
-      data,
-    });
-  }
 
-  async deleteSubgroup(subgroupId: string) {
-    return this.prisma.subgroup.delete({
-      where: { id: subgroupId },
-    });
-  }
-
-  async reorderSubgroups(orderedIds: string[]) {
-    const updates = orderedIds.map((id, index) =>
-      this.prisma.subgroup.update({
-        where: { id },
-        data: { rankKey: index.toString(36) },
-      }),
-    );
-    return Promise.all(updates);
-  }
-
-  async moveAssetToGroup(params: {
-    assetId: string;
-    groupId: string;
-    subgroupId?: string;
-  }) {
-    await this.prisma.groupAsset.deleteMany({
-      where: {
-        assetId: params.assetId,
-        groupId: { not: params.groupId },
-      },
-    });
-
-    const existing = await this.prisma.groupAsset.findUnique({
-      where: { groupId_assetId: { groupId: params.groupId, assetId: params.assetId } },
-    });
-
-    if (existing) {
-      return this.prisma.groupAsset.update({
-        where: { id: existing.id },
-        data: { subgroupId: params.subgroupId || null },
-      });
-    }
-
-    const lastAsset = await this.prisma.groupAsset.findFirst({
-      where: { groupId: params.groupId },
-      orderBy: { rankKey: 'desc' },
-      select: { rankKey: true },
-    });
-
-    const rankKey = lastAsset
-      ? (parseInt(lastAsset.rankKey, 36) + 1).toString(36)
-      : '1';
-
-    return this.prisma.groupAsset.create({
-      data: {
-        groupId: params.groupId,
-        subgroupId: params.subgroupId || null,
-        assetId: params.assetId,
-        rankKey,
-      },
-    });
-  }
-
-  async batchMoveAssetsToGroup(params: {
-    assetIds: string[];
-    groupId: string;
-    subgroupId?: string;
-  }) {
-    const results = [];
-    for (const assetId of params.assetIds) {
-      results.push(
-        await this.moveAssetToGroup({
-          assetId,
-          groupId: params.groupId,
-          subgroupId: params.subgroupId,
-        }),
+      const existingDefaultSubgroup = group.subgroups.find(
+        (subgroup) => subgroup.name === DEFAULT_GROUP_NAME,
       );
-    }
-    return results;
-  }
+      const defaultSubgroup =
+        existingDefaultSubgroup ||
+        (await tx.subgroup.create({
+          data: {
+            groupId: group.id,
+            name: DEFAULT_GROUP_NAME,
+            rankKey: '1',
+          },
+        }));
 
-  async moveGroupAssetRank(params: {
-    assetId: string;
-    groupId: string;
-    subgroupId?: string | null;
-    beforeAssetId?: string | null;
-    afterAssetId?: string | null;
-  }) {
-    const group = await this.prisma.group.findUnique({
-      where: { id: params.groupId },
-      select: { randomEnabled: true },
-    });
-    if (!group) throw new BadRequestException('Group not found');
-    if (group.randomEnabled) {
-      throw new BadRequestException('Random enabled groups cannot be manually sorted');
-    }
-
-    const moving = await this.prisma.groupAsset.findUnique({
-      where: { groupId_assetId: { groupId: params.groupId, assetId: params.assetId } },
-    });
-    if (!moving) throw new BadRequestException('Asset is not in this group');
-
-    const normalizedSubgroupId = params.subgroupId || null;
-    if ((moving.subgroupId || null) !== normalizedSubgroupId) {
-      throw new BadRequestException('Asset is not in the target subgroup');
-    }
-
-    const scopeWhere = {
-      groupId: params.groupId,
-      subgroupId: normalizedSubgroupId,
-    };
-
-    let before = params.beforeAssetId
-      ? await this.prisma.groupAsset.findUnique({
-          where: { groupId_assetId: { groupId: params.groupId, assetId: params.beforeAssetId } },
-        })
-      : null;
-    let after = params.afterAssetId
-      ? await this.prisma.groupAsset.findUnique({
-          where: { groupId_assetId: { groupId: params.groupId, assetId: params.afterAssetId } },
-        })
-      : null;
-
-    for (const neighbor of [before, after]) {
-      if (!neighbor) continue;
-      if ((neighbor.subgroupId || null) !== normalizedSubgroupId) {
-        throw new BadRequestException('Cannot sort across subgroups');
-      }
-    }
-
-    if (!before && !after) {
-      after = await this.prisma.groupAsset.findFirst({
-        where: { ...scopeWhere, assetId: { not: params.assetId } },
-        orderBy: { rankKey: 'desc' },
-      });
-    }
-
-    let nextRank = this.rankBetween(after?.rankKey || null, before?.rankKey || null);
-    if (!nextRank) {
-      await this.rebalanceGroupAssetRanks(params.groupId, normalizedSubgroupId);
-      before = params.beforeAssetId
-        ? await this.prisma.groupAsset.findUnique({
-            where: { groupId_assetId: { groupId: params.groupId, assetId: params.beforeAssetId } },
-          })
-        : null;
-      after = params.afterAssetId
-        ? await this.prisma.groupAsset.findUnique({
-            where: { groupId_assetId: { groupId: params.groupId, assetId: params.afterAssetId } },
-          })
-        : null;
-      nextRank = this.rankBetween(after?.rankKey || null, before?.rankKey || null);
-    }
-
-    if (!nextRank) throw new BadRequestException('Unable to generate rank key');
-
-    return this.prisma.groupAsset.update({
-      where: { id: moving.id },
-      data: { rankKey: nextRank },
+      return { group, subgroup: defaultSubgroup };
     });
   }
 
-  private rankBetween(afterRank: string | null, beforeRank: string | null) {
-    const low = afterRank ? this.parseRank(afterRank) : 0n;
-    const high = beforeRank ? this.parseRank(beforeRank) : this.RANK_MAX;
-    if (high - low <= 1n) return null;
-    return this.formatRank((low + high) / 2n);
+  async ensureDefaultSubgroup(groupId: string) {
+    return this.subgroupService.ensureDefaultSubgroup(groupId);
   }
 
-  private parseRank(rank: string) {
-    let value = 0n;
-    for (const char of rank.toLowerCase()) {
-      const digit = BigInt(parseInt(char, 36));
-      if (digit < 0n || digit >= this.RANK_RADIX) continue;
-      value = value * this.RANK_RADIX + digit;
-    }
-    return value;
-  }
-
-  private formatRank(value: bigint) {
-    return value.toString(36).padStart(this.RANK_WIDTH, '0');
-  }
-
-  private normalizeSlug(value: string) {
-    const slug = value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    return slug || this.DEFAULT_SLUG;
-  }
-
-  private async uniqueGroupSlug(value: string, tx: any = this.prisma) {
-    const base = this.normalizeSlug(value);
-    let slug = base;
-    let suffix = 2;
-
-    while (await tx.group.findUnique({ where: { slug }, select: { id: true } })) {
-      slug = `${base}-${suffix}`;
-      suffix += 1;
-    }
-
-    return slug;
-  }
-
-  private async rebalanceGroupAssetRanks(groupId: string, subgroupId: string | null) {
-    const items = await this.prisma.groupAsset.findMany({
-      where: { groupId, subgroupId },
-      orderBy: { rankKey: 'asc' },
-      select: { id: true },
-    });
-    const step = this.RANK_MAX / BigInt(items.length + 1);
-    await this.prisma.$transaction(
-      items.map((item, index) =>
-        this.prisma.groupAsset.update({
-          where: { id: item.id },
-          data: { rankKey: this.formatRank(step * BigInt(index + 1)) },
-        }),
-      ),
-    );
+  private isDefaultGroup(group: { slug?: string | null; name?: string | null }) {
+    return group.slug === DEFAULT_GROUP_SLUG || group.name === DEFAULT_GROUP_NAME;
   }
 }

@@ -9,12 +9,18 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { GroupService } from './group.service';
+import { SubgroupService } from './subgroup.service';
+import { GroupAssetService } from './group-asset.service';
 import { TokenGuard } from '../auth/token.guard';
 import { AdminGuard } from '../auth/admin.guard';
 
 @Controller()
 export class GroupController {
-  constructor(private groupService: GroupService) {}
+  constructor(
+    private groupService: GroupService,
+    private subgroupService: SubgroupService,
+    private groupAssetService: GroupAssetService,
+  ) {}
 
   // ---- Visitor endpoints ----
 
@@ -38,7 +44,7 @@ export class GroupController {
   @Get('groups/:id/subgroups')
   @UseGuards(TokenGuard)
   async listSubgroups(@Param('id') id: string) {
-    const subgroups = await this.groupService.listSubgroups(id);
+    const subgroups = await this.subgroupService.listSubgroups(id);
     return { success: true, data: subgroups };
   }
 
@@ -84,7 +90,7 @@ export class GroupController {
   async createSubgroup(
     @Body() body: { groupId: string; name: string; description?: string },
   ) {
-    const subgroup = await this.groupService.createSubgroup(body);
+    const subgroup = await this.subgroupService.createSubgroup(body);
     return { success: true, data: subgroup };
   }
 
@@ -94,21 +100,21 @@ export class GroupController {
     @Param('id') id: string,
     @Body() body: { name?: string; description?: string },
   ) {
-    const subgroup = await this.groupService.updateSubgroup(id, body);
+    const subgroup = await this.subgroupService.updateSubgroup(id, body);
     return { success: true, data: subgroup };
   }
 
   @Delete('admin/subgroups/:id')
   @UseGuards(TokenGuard, AdminGuard)
   async deleteSubgroup(@Param('id') id: string) {
-    await this.groupService.deleteSubgroup(id);
+    await this.subgroupService.deleteSubgroup(id);
     return { success: true };
   }
 
   @Post('admin/subgroups/reorder')
   @UseGuards(TokenGuard, AdminGuard)
   async reorderSubgroups(@Body() body: { orderedIds: string[] }) {
-    const subgroups = await this.groupService.reorderSubgroups(body.orderedIds);
+    const subgroups = await this.subgroupService.reorderSubgroups(body.orderedIds);
     return { success: true, data: subgroups };
   }
 
@@ -117,7 +123,7 @@ export class GroupController {
   async moveAssetsToGroup(
     @Body() body: { assetIds: string[]; groupId: string; subgroupId?: string },
   ) {
-    const results = await this.groupService.batchMoveAssetsToGroup(body);
+    const results = await this.groupAssetService.batchMoveAssetsToGroup(body);
     return { success: true, data: results };
   }
 
@@ -127,7 +133,7 @@ export class GroupController {
     @Param('id') id: string,
     @Body() body: { assetId: string; subgroupId?: string | null; beforeAssetId?: string | null; afterAssetId?: string | null },
   ) {
-    const result = await this.groupService.moveGroupAssetRank({
+    const result = await this.groupAssetService.moveGroupAssetRank({
       groupId: id,
       assetId: body.assetId,
       subgroupId: body.subgroupId,
