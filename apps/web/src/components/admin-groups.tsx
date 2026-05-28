@@ -109,6 +109,11 @@ export function AdminGroupManager() {
 
   const handleCreateGroup = async () => {
     if (!token || !form.name.trim()) return;
+    const nameExists = groups.some((g) => g.name === form.name.trim());
+    if (nameExists) {
+      showToast('error', `分组名称 "${form.name.trim()}" 已存在`);
+      return;
+    }
     const result = await apiFetch('/admin/groups', token, {
       method: 'POST',
       body: JSON.stringify({
@@ -128,6 +133,11 @@ export function AdminGroupManager() {
 
   const handleUpdateGroup = async () => {
     if (!token || !editingGroup) return;
+    const nameExists = groups.some((g) => g.name === form.name.trim() && g.id !== editingGroup.id);
+    if (nameExists) {
+      showToast('error', `分组名称 "${form.name.trim()}" 已存在`);
+      return;
+    }
     const result = await apiFetch(`/admin/groups/${editingGroup.id}`, token, {
       method: 'PATCH',
       body: JSON.stringify({
@@ -156,6 +166,11 @@ export function AdminGroupManager() {
 
   const handleCreateSubgroup = async (groupId: string) => {
     if (!token || !subgroupName.trim()) return;
+    const parentGroup = groups.find((g) => g.id === groupId);
+    if (parentGroup?.subgroups?.some((s) => s.name === subgroupName.trim())) {
+      showToast('error', `该分组下已存在名为 "${subgroupName.trim()}" 的二级分组`);
+      return;
+    }
     const result = await apiFetch('/admin/subgroups', token, {
       method: 'POST',
       body: JSON.stringify({ groupId, name: subgroupName.trim() }),
@@ -169,6 +184,11 @@ export function AdminGroupManager() {
 
   const handleUpdateSubgroup = async () => {
     if (!token || !editingSubgroupId || !editingSubgroupName.trim()) return;
+    const parentGroup = groups.find((g) => g.subgroups?.some((s) => s.id === editingSubgroupId));
+    if (parentGroup?.subgroups?.some((s) => s.name === editingSubgroupName.trim() && s.id !== editingSubgroupId)) {
+      showToast('error', `该分组下已存在名为 "${editingSubgroupName.trim()}" 的二级分组`);
+      return;
+    }
     const result = await apiFetch(`/admin/subgroups/${editingSubgroupId}`, token, {
       method: 'PATCH',
       body: JSON.stringify({ name: editingSubgroupName.trim() }),
