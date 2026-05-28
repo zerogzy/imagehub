@@ -42,6 +42,8 @@ export function AdminGroupManager() {
   const [form, setForm] = useState<GroupFormData>(emptyForm);
   const [creatingSubgroupFor, setCreatingSubgroupFor] = useState<string | null>(null);
   const [subgroupName, setSubgroupName] = useState('');
+  const [editingSubgroupId, setEditingSubgroupId] = useState<string | null>(null);
+  const [editingSubgroupName, setEditingSubgroupName] = useState('');
 
   const token = useAuthStore((s) => s.token);
 
@@ -131,7 +133,7 @@ export function AdminGroupManager() {
       body: JSON.stringify({
         name: form.name.trim(),
         slug: form.slug || slugify(form.name),
-        description: form.description || undefined,
+        description: form.description || null,
         randomEnabled: form.randomEnabled,
         randomRotateInterval: form.randomRotateInterval || undefined,
       }),
@@ -165,6 +167,19 @@ export function AdminGroupManager() {
     fetchGroups();
   };
 
+  const handleUpdateSubgroup = async () => {
+    if (!token || !editingSubgroupId || !editingSubgroupName.trim()) return;
+    const result = await apiFetch(`/admin/subgroups/${editingSubgroupId}`, token, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: editingSubgroupName.trim() }),
+    });
+    if (result.error) { showToast('error', result.error); return; }
+    showToast('success', '二级分组更新成功');
+    setEditingSubgroupId(null);
+    setEditingSubgroupName('');
+    fetchGroups();
+  };
+
   const handleDeleteSubgroup = async (subgroupId: string) => {
     if (!token) return;
     if (!confirm('确定要删除此二级分组吗？')) return;
@@ -172,6 +187,16 @@ export function AdminGroupManager() {
     if (result.error) { showToast('error', result.error); return; }
     showToast('success', '二级分组已删除');
     fetchGroups();
+  };
+
+  const startEditSubgroup = (subgroup: AdminSubgroup) => {
+    setEditingSubgroupId(subgroup.id);
+    setEditingSubgroupName(subgroup.name);
+  };
+
+  const cancelEditSubgroup = () => {
+    setEditingSubgroupId(null);
+    setEditingSubgroupName('');
   };
 
   const toggleExpand = (groupId: string) => {
@@ -236,6 +261,8 @@ export function AdminGroupManager() {
                 disableDrag={group.slug === DEFAULT_GROUP_SLUG}
                 creatingSubgroupFor={creatingSubgroupFor}
                 subgroupName={subgroupName}
+                editingSubgroupId={editingSubgroupId}
+                editingSubgroupName={editingSubgroupName}
                 onToggleExpand={toggleExpand}
                 onStartCreateSubgroup={setCreatingSubgroupFor}
                 onEditGroup={openEditModal}
@@ -243,6 +270,10 @@ export function AdminGroupManager() {
                 onConfirmCreateSubgroup={handleCreateSubgroup}
                 onCancelCreateSubgroup={() => { setCreatingSubgroupFor(null); setSubgroupName(''); }}
                 onSubgroupNameChange={setSubgroupName}
+                onStartEditSubgroup={startEditSubgroup}
+                onConfirmEditSubgroup={handleUpdateSubgroup}
+                onCancelEditSubgroup={cancelEditSubgroup}
+                onEditingSubgroupNameChange={setEditingSubgroupName}
                 onDeleteSubgroup={handleDeleteSubgroup}
               />
             ))}

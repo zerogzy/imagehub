@@ -49,7 +49,7 @@ export class GroupService {
   async createGroup(data: {
     name: string;
     slug: string;
-    description?: string;
+    description?: string | null;
     randomEnabled?: boolean;
     randomRotateInterval?: number;
   }) {
@@ -156,7 +156,7 @@ export class GroupService {
     data: {
       name?: string;
       slug?: string;
-      description?: string;
+      description?: string | null;
       randomEnabled?: boolean;
       randomRotateInterval?: number;
     },
@@ -210,7 +210,7 @@ export class GroupService {
   async createSubgroup(data: {
     groupId: string;
     name: string;
-    description?: string;
+    description?: string | null;
   }) {
     const lastSub = await this.prisma.subgroup.findFirst({
       where: { groupId: data.groupId },

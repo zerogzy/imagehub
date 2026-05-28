@@ -47,7 +47,7 @@ export class GroupController {
   @Post('admin/groups')
   @UseGuards(TokenGuard, AdminGuard)
   async createGroup(
-    @Body() body: { name: string; slug: string; description?: string; randomEnabled?: boolean; randomRotateInterval?: number },
+    @Body() body: { name: string; slug: string; description?: string | null; randomEnabled?: boolean; randomRotateInterval?: number },
   ) {
     const group = await this.groupService.createGroup(body);
     return { success: true, data: group };
@@ -57,7 +57,7 @@ export class GroupController {
   @UseGuards(TokenGuard, AdminGuard)
   async updateGroup(
     @Param('id') id: string,
-    @Body() body: { name?: string; slug?: string; description?: string; randomEnabled?: boolean; randomRotateInterval?: number },
+    @Body() body: { name?: string; slug?: string; description?: string | null; randomEnabled?: boolean; randomRotateInterval?: number },
   ) {
     const group = await this.groupService.updateGroup(id, body);
     return { success: true, data: group };

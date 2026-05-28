@@ -12,6 +12,7 @@ import {
   Check,
   GripVertical,
   FolderPlus,
+  X,
 } from 'lucide-react';
 
 export interface AdminSubgroup {
@@ -41,6 +42,8 @@ interface SortableGroupRowProps {
   disableDrag: boolean;
   creatingSubgroupFor: string | null;
   subgroupName: string;
+  editingSubgroupId: string | null;
+  editingSubgroupName: string;
   onToggleExpand: (id: string) => void;
   onStartCreateSubgroup: (id: string) => void;
   onEditGroup: (group: AdminGroup) => void;
@@ -48,6 +51,10 @@ interface SortableGroupRowProps {
   onConfirmCreateSubgroup: (id: string) => void;
   onCancelCreateSubgroup: () => void;
   onSubgroupNameChange: (name: string) => void;
+  onStartEditSubgroup: (subgroup: AdminSubgroup) => void;
+  onConfirmEditSubgroup: () => void;
+  onCancelEditSubgroup: () => void;
+  onEditingSubgroupNameChange: (name: string) => void;
   onDeleteSubgroup: (id: string) => void;
 }
 
@@ -57,6 +64,8 @@ export function SortableGroupRow({
   disableDrag,
   creatingSubgroupFor,
   subgroupName,
+  editingSubgroupId,
+  editingSubgroupName,
   onToggleExpand,
   onStartCreateSubgroup,
   onEditGroup,
@@ -64,6 +73,10 @@ export function SortableGroupRow({
   onConfirmCreateSubgroup,
   onCancelCreateSubgroup,
   onSubgroupNameChange,
+  onStartEditSubgroup,
+  onConfirmEditSubgroup,
+  onCancelEditSubgroup,
+  onEditingSubgroupNameChange,
   onDeleteSubgroup,
 }: SortableGroupRowProps) {
   const {
@@ -176,17 +189,56 @@ export function SortableGroupRow({
               className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-background-secondary transition-colors"
             >
               <FolderOpen className="h-4 w-4 text-text-muted" />
-              <span className="flex-1 text-sm text-text-primary">{sub.name}</span>
-              <span className="text-xs text-text-muted">
-                {sub._count?.groupAssets ?? 0} 张
-              </span>
-              <button
-                onClick={() => onDeleteSubgroup(sub.id)}
-                className="rounded p-1 text-text-muted hover:text-danger transition-colors"
-                aria-label="删除二级分组"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              {editingSubgroupId === sub.id ? (
+                <>
+                  <input
+                    type="text"
+                    value={editingSubgroupName}
+                    onChange={(e) => onEditingSubgroupNameChange(e.target.value)}
+                    className="h-7 flex-1 rounded-md border border-border px-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') onConfirmEditSubgroup();
+                      if (e.key === 'Escape') onCancelEditSubgroup();
+                    }}
+                  />
+                  <button
+                    onClick={onConfirmEditSubgroup}
+                    className="rounded p-1 text-primary hover:bg-primary/10 transition-colors"
+                    aria-label="确认"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={onCancelEditSubgroup}
+                    className="rounded p-1 text-text-muted hover:text-text-primary transition-colors"
+                    aria-label="取消"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm text-text-primary">{sub.name}</span>
+                  <span className="text-xs text-text-muted">
+                    {sub._count?.groupAssets ?? 0} 张
+                  </span>
+                  <button
+                    onClick={() => onStartEditSubgroup(sub)}
+                    className="rounded p-1 text-text-muted hover:text-primary transition-colors"
+                    aria-label="编辑二级分组"
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteSubgroup(sub.id)}
+                    className="rounded p-1 text-text-muted hover:text-danger transition-colors"
+                    aria-label="删除二级分组"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
             </div>
           ))}
         </div>
