@@ -642,7 +642,10 @@ export function AdminMediaManager() {
       <button
         draggable={false}
         onClick={(e) => { e.stopPropagation(); toggleSelect(asset.id); }}
-        className="absolute left-2 top-2 z-10 rounded bg-white/85 p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+        className={cn(
+          'absolute left-2 top-2 z-10 rounded bg-white/85 p-0.5 transition-opacity',
+          selected.has(asset.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        )}
         aria-label={selected.has(asset.id) ? '取消选择' : '选择'}
       >
         {selected.has(asset.id) ? (
@@ -776,25 +779,6 @@ export function AdminMediaManager() {
           <option value="video">视频</option>
           <option value="audio">音频</option>
         </select>
-
-        {showBulkActions && (
-          <div className="flex items-center gap-2 rounded-lg bg-primary-light px-3 py-1.5">
-            <span className="text-sm font-medium text-primary">已选 {selected.size} 项</span>
-            <button
-              onClick={handleBulkDelete}
-              className="flex items-center gap-1 rounded-md bg-danger px-2.5 py-1 text-xs font-medium text-white hover:bg-danger-dark transition-colors"
-            >
-              <Trash2 className="h-3 w-3" />
-            删除
-          </button>
-            <button
-              onClick={() => setSelected(new Set())}
-              className="text-xs text-text-muted hover:text-text-primary transition-colors"
-            >
-              取消选择
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="mb-3 flex items-center gap-2">
@@ -1095,6 +1079,30 @@ export function AdminMediaManager() {
             fetchGroupsAndTags();
           }}
         />
+      )}
+
+      {showBulkActions && (
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 sm:bottom-6 md:left-60"
+          aria-live="polite"
+        >
+          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-white px-4 py-2 shadow-modal animate-slide-up">
+            <span className="text-sm font-medium text-primary">已选 {selected.size} 项</span>
+            <button
+              onClick={handleBulkDelete}
+              className="flex items-center gap-1 rounded-full bg-danger px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-danger-dark"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              删除
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="rounded-full px-2 py-1 text-xs text-text-muted transition-colors hover:bg-background-secondary hover:text-text-primary"
+            >
+              取消选择
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
