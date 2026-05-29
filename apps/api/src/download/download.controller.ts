@@ -15,6 +15,7 @@ import { AdminGuard } from '../auth/admin.guard';
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { Request } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { buildContentDisposition } from './content-disposition.helper';
 
 @Controller()
 export class DownloadController {
@@ -55,8 +56,8 @@ export class DownloadController {
       return;
     }
 
-    const storageKey = await this.downloadService.getAssetStorageKey(downloadToken.assetId);
-    if (!storageKey) {
+    const asset = await this.downloadService.getDownloadableAsset(downloadToken.assetId);
+    if (!asset) {
       res.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'File not found' } });
       return;
     }
@@ -68,11 +69,12 @@ export class DownloadController {
       req,
     });
 
-    const stream = this.downloadService.getAssetStream(storageKey);
-    const stats = await this.downloadService.getAssetStats(storageKey);
+    const stream = this.downloadService.getAssetStream(asset.storageKey);
+    const stats = await this.downloadService.getAssetStats(asset.storageKey);
 
-    res.header('Content-Disposition', `attachment; filename="${downloadToken.assetId}"`);
-    res.header('Content-Type', 'application/octet-stream');
+    const filename = asset.displayFilename || asset.originalFilename;
+    res.header('Content-Disposition', buildContentDisposition(filename));
+    res.header('Content-Type', asset.mimeType || 'application/octet-stream');
     res.header('Content-Length', stats.size.toString());
     res.send(stream);
   }
@@ -104,8 +106,9 @@ export class DownloadController {
     const stream = this.downloadService.getAssetStream(storageKey);
     const stats = await this.downloadService.getAssetStats(storageKey);
 
-    res.header('Content-Disposition', `attachment; filename="${share.asset.originalFilename}"`);
-    res.header('Content-Type', 'application/octet-stream');
+    const filename = share.asset.displayFilename || share.asset.originalFilename;
+    res.header('Content-Disposition', buildContentDisposition(filename));
+    res.header('Content-Type', share.asset.mimeType || 'application/octet-stream');
     res.header('Content-Length', stats.size.toString());
     res.send(stream);
   }

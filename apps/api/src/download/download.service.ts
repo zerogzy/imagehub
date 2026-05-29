@@ -166,6 +166,24 @@ export class DownloadService {
   }
 
   /**
+   * 拉下载所需的完整 asset 信息: storageKey + 原始文件名 + mime, 用于设置下载头。
+   */
+  async getDownloadableAsset(assetId: string) {
+    const asset = await this.prisma.mediaAsset.findUnique({
+      where: { id: assetId },
+      select: {
+        storageKey: true,
+        status: true,
+        originalFilename: true,
+        displayFilename: true,
+        mimeType: true,
+      },
+    });
+    if (!asset || asset.status === 'trashed') return null;
+    return asset;
+  }
+
+  /**
    * Create a batch download job.
    */
   async createBatchDownload(params: {

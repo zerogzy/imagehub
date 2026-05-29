@@ -80,6 +80,8 @@ export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged, 
   const [moveSubgroupId, setMoveSubgroupId] = useState('');
   const [moving, setMoving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [originalBlobUrl, setOriginalBlobUrl] = useState<string | null>(null);
+  const [originalLoading, setOriginalLoading] = useState(false);
   const [zoom, setZoom] = useState({
     scale: 1,
     originX: 0,
@@ -99,6 +101,42 @@ export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged, 
     loadAsset();
     loadAdminOptions();
   }, [assetId, token]);
+
+  // 图片切换时拉鉴权原图; 切走 / 关闭时释放 blob URL 防内存泄漏。
+  useEffect(() => {
+    if (!token || !asset || asset.mediaType !== 'image') {
+      return;
+    }
+    let cancelled = false;
+    let createdUrl: string | null = null;
+
+    (async () => {
+      setOriginalLoading(true);
+      try {
+        const res = await fetch(`/api/v1/assets/${asset.id}/original`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          setOriginalLoading(false);
+          return;
+        }
+        const blob = await res.blob();
+        if (cancelled) return;
+        createdUrl = URL.createObjectURL(blob);
+        setOriginalBlobUrl(createdUrl);
+      } catch {
+        // 失败时保持原 blob (若有) 或显示 loading 占位; 不致命
+      } finally {
+        if (!cancelled) setOriginalLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+      setOriginalBlobUrl(null);
+    };
+  }, [asset?.id, asset?.mediaType, token]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -315,17 +353,20 @@ export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged, 
 
   if (!asset) return null;
 
-  // 图片走派生图 (large→preview) 展示，原图 URL 不进入 DOM，防止绕过下载按钮直取原图。
-  // GIF/视频/音频需要原始文件播放或展示动画，仍使用原图直链。
+  // 图片走鉴权原图 (blob URL), DOM 里只暴露 blob: 协议 URL, 真实路径与原图直链都不外泄。
+  // 原图通过 fetch + Bearer token 拉到, 走 GET /assets/:id/original (TokenGuard)。
+  // 缩略图作为加载兜底, 在 blob 还没拉到时先显示 large 派生图。
+  // GIF/视频/音频需要播放, 仍使用原图直链 (storage/originals 对它们放行)。
   const derivativeUrl = (type: string) => {
     const key = asset.derivatives.find((d) => d.derivativeType === type)?.storageKey;
     return key ? `/api/v1/storage/derivatives/${key.replace('preview/', '')}` : null;
   };
   const originalUrl = `/api/v1/storage/originals/${asset.storageKey.replace('original/', '')}`;
   const isPlayable = asset.mediaType === 'video' || asset.mediaType === 'audio' || asset.mediaType === 'gif';
+  const placeholderUrl = derivativeUrl('large') || derivativeUrl('preview') || derivativeUrl('thumb');
   const displayUrl = isPlayable
     ? originalUrl
-    : derivativeUrl('large') || derivativeUrl('preview') || derivativeUrl('thumb') || originalUrl;
+    : originalBlobUrl || placeholderUrl || '';
   const currentGroup = asset.groupAssets[0];
   const activeMoveGroupId = moveGroupId || currentGroup?.group.id || groups[0]?.id || '';
 
@@ -433,22 +474,30 @@ export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged, 
               </audio>
             </div>
           ) : (
-            <img
-              src={displayUrl}
-              alt={asset.displayFilename || asset.originalFilename}
-              draggable={false}
-              onDoubleClick={handleImageDoubleClick}
-              onMouseDown={handleImageMouseDown}
-              className={cn(
-                'max-h-[calc(100dvh-96px)] max-w-full select-none rounded-lg object-contain md:max-h-[calc(90vh-100px)]',
-                isDraggingImage ? 'cursor-grabbing' : isZoomed ? 'cursor-grab' : 'cursor-zoom-in',
+            <div className="relative flex max-h-full max-w-full items-center justify-center">
+              <img
+                src={displayUrl}
+                alt={asset.displayFilename || asset.originalFilename}
+                draggable={false}
+                onDoubleClick={handleImageDoubleClick}
+                onMouseDown={handleImageMouseDown}
+                className={cn(
+                  'max-h-[calc(100dvh-96px)] max-w-full select-none rounded-lg object-contain md:max-h-[calc(90vh-100px)]',
+                  isDraggingImage ? 'cursor-grabbing' : isZoomed ? 'cursor-grab' : 'cursor-zoom-in',
+                )}
+                style={{
+                  transform: `translate(${zoom.offsetX}px, ${zoom.offsetY}px) scale(${zoom.scale})`,
+                  transformOrigin: `${zoom.originX}px ${zoom.originY}px`,
+                  transition: isDraggingImage ? 'none' : 'transform 160ms ease-out',
+                }}
+              />
+              {originalLoading && !originalBlobUrl && (
+                <div className="pointer-events-none absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white shadow-md">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  加载原图
+                </div>
               )}
-              style={{
-                transform: `translate(${zoom.offsetX}px, ${zoom.offsetY}px) scale(${zoom.scale})`,
-                transformOrigin: `${zoom.originX}px ${zoom.originY}px`,
-                transition: isDraggingImage ? 'none' : 'transform 160ms ease-out',
-              }}
-            />
+            </div>
           )}
         </div>
 

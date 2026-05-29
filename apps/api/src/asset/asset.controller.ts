@@ -9,12 +9,15 @@ import {
   Body,
   Request,
   Post,
+  Res,
 } from '@nestjs/common';
 import { AssetService } from './asset.service';
 import { StatsService } from '../stats/stats.service';
+import { StorageService } from '../storage/storage.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { TokenGuard } from '../auth/token.guard';
 import { AdminGuard } from '../auth/admin.guard';
-import { FastifyRequest } from 'fastify';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import * as crypto from 'crypto';
 
 @Controller()
@@ -22,6 +25,8 @@ export class AssetController {
   constructor(
     private assetService: AssetService,
     private statsService: StatsService,
+    private storageService: StorageService,
+    private prisma: PrismaService,
   ) {}
 
   /**
@@ -69,6 +74,47 @@ export class AssetController {
     this.recordAccessEvent(asset.id, token.id, req);
 
     return { success: true, data: asset };
+  }
+
+  /**
+   * 鉴权访问原图 - 给详情页内联展示原图用。
+   *
+   * 走 TokenGuard 后内联返回 (Content-Disposition: inline), 前端用 fetch + blob URL
+   * 装到 <img> 即可。DOM 中只出现 blob: URL, 原图直链/真实路径都不外泄。
+   */
+  @Get('assets/:id/original')
+  @UseGuards(TokenGuard)
+  async getAssetOriginal(
+    @Param('id') id: string,
+    @Res() res: FastifyReply,
+    @Request() req: FastifyRequest,
+  ) {
+    const asset = await this.prisma.mediaAsset.findUnique({
+      where: { id },
+      select: { storageKey: true, status: true, mimeType: true },
+    });
+    if (!asset || asset.status === 'trashed') {
+      res.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'Asset not found' } });
+      return;
+    }
+
+    const exists = await this.storageService.exists(asset.storageKey);
+    if (!exists) {
+      res.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'File not found' } });
+      return;
+    }
+
+    const stream = this.storageService.getStream(asset.storageKey);
+    const stats = await this.storageService.getStats(asset.storageKey);
+
+    const token = (req as any).token;
+    this.recordAccessEvent(id, token?.id, req);
+
+    res.header('Content-Type', asset.mimeType || 'application/octet-stream');
+    res.header('Content-Length', stats.size.toString());
+    res.header('Content-Disposition', 'inline');
+    res.header('Cache-Control', 'private, max-age=300');
+    res.send(stream);
   }
 
   private recordAccessEvent(assetId: string, tokenId: string | undefined, req: FastifyRequest) {
