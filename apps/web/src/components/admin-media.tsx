@@ -1067,6 +1067,7 @@ export function AdminMediaManager() {
       {detailAssetId && (
         <AssetDetailModal
           assetId={detailAssetId}
+          defaultShowInfo
           onPrev={handleDetailPrev}
           onNext={handleDetailNext}
           onChanged={() => {

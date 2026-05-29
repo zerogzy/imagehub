@@ -63,12 +63,13 @@ interface AssetDetailModalProps {
   onPrev?: () => void;
   onNext?: () => void;
   onChanged?: () => void;
+  defaultShowInfo?: boolean;
 }
 
-export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged }: AssetDetailModalProps) {
+export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged, defaultShowInfo = false }: AssetDetailModalProps) {
   const [asset, setAsset] = useState<AssetDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showInfo, setShowInfo] = useState(false);
+  const [showInfo, setShowInfo] = useState(defaultShowInfo);
   const [downloading, setDownloading] = useState(false);
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [tags, setTags] = useState<TagItem[]>([]);
