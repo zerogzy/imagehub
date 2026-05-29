@@ -1083,10 +1083,10 @@ export function AdminMediaManager() {
 
       {showBulkActions && (
         <div
-          className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 sm:bottom-6 md:left-60"
+          className="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 sm:bottom-6 md:bottom-auto md:left-auto md:right-6 md:top-6 md:justify-end md:px-0"
           aria-live="polite"
         >
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-white px-4 py-2 shadow-modal animate-slide-up">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-white px-4 py-2 shadow-modal animate-slide-up md:animate-slide-down">
             <span className="text-sm font-medium text-primary">已选 {selected.size} 项</span>
             <button
               onClick={handleBulkDelete}
