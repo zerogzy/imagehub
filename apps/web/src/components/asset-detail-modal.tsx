@@ -444,7 +444,7 @@ export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged, 
 
         {/* Info panel */}
         {showInfo && (
-          <div className="absolute inset-x-0 bottom-0 z-20 max-h-[52dvh] overflow-y-auto rounded-t-2xl border-t border-border bg-white px-5 pb-6 pt-5 shadow-2xl md:static md:w-2/5 md:rounded-none md:border-l md:border-t-0 md:px-6 md:pt-20 md:shadow-none">
+          <div className="absolute inset-x-0 bottom-0 z-20 max-h-[52dvh] overflow-y-auto rounded-t-2xl border-t border-border bg-white px-5 pb-6 pt-5 shadow-2xl md:static md:max-h-none md:w-2/5 md:rounded-none md:border-l md:border-t-0 md:px-6 md:pt-20 md:shadow-none">
             <h2 className="text-lg font-semibold text-text-primary">
               {asset.displayFilename || asset.originalFilename}
             </h2>
