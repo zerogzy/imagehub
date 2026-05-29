@@ -42,6 +42,27 @@ export function GalleryPage() {
   const [meta, setMeta] = useState({ page: 1, pageSize: 40, total: 0, totalPages: 0 });
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  // 复制链接 (/gallery?asset=<id>) 打开后直接进入对应图片详情页
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const assetParam = params.get('asset');
+    if (assetParam) setDetailAssetId(assetParam);
+  }, []);
+
+  const openDetail = useCallback((id: string) => {
+    setDetailAssetId(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set('asset', id);
+    window.history.replaceState(null, '', url.toString());
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setDetailAssetId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('asset');
+    window.history.replaceState(null, '', url.toString());
+  }, []);
+
   const token = useAuthStore((s) => s.token);
   const { currentGroupId, currentSubgroupId, sortMode, mediaType, selectedTag, searchQuery, currentSeed } =
     useGalleryStore();
@@ -107,8 +128,8 @@ export function GalleryPage() {
   }, [hasMore, loading, page, fetchGallery]);
 
   const currentIndex = assets.findIndex((a) => a.id === detailAssetId);
-  const handlePrev = currentIndex > 0 ? () => setDetailAssetId(assets[currentIndex - 1].id) : undefined;
-  const handleNext = currentIndex < assets.length - 1 ? () => setDetailAssetId(assets[currentIndex + 1].id) : undefined;
+  const handlePrev = currentIndex > 0 ? () => openDetail(assets[currentIndex - 1].id) : undefined;
+  const handleNext = currentIndex < assets.length - 1 ? () => openDetail(assets[currentIndex + 1].id) : undefined;
 
   return (
     <div className="p-4 pt-14 md:pt-4">
@@ -146,7 +167,7 @@ export function GalleryPage() {
           <p className="text-sm">暂无媒体文件</p>
         </div>
       ) : (
-        <JustifiedPhotoWall assets={assets} onAssetClick={(asset) => setDetailAssetId(asset.id)} />
+        <JustifiedPhotoWall assets={assets} onAssetClick={(asset) => openDetail(asset.id)} />
       )}
 
       {/* Loading indicator */}
@@ -163,7 +184,7 @@ export function GalleryPage() {
       {detailAssetId && (
         <AssetDetailModal
           assetId={detailAssetId}
-          onClose={() => setDetailAssetId(null)}
+          onClose={closeDetail}
           onPrev={handlePrev}
           onNext={handleNext}
         />

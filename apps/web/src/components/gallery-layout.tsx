@@ -18,7 +18,10 @@ export function GalleryLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hasHydrated) return;
     if (!token || isSessionExpired()) {
-      router.replace('/');
+      // 未登录时保留目标地址 (含 ?asset=)，登录后跳回，复制链接体验闭环
+      const target = window.location.pathname + window.location.search;
+      const redirect = target && target !== '/' ? `/?redirect=${encodeURIComponent(target)}` : '/';
+      router.replace(redirect);
     }
   }, [token, hasHydrated, isSessionExpired, router]);
 

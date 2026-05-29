@@ -315,7 +315,17 @@ export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged, 
 
   if (!asset) return null;
 
+  // 图片走派生图 (large→preview) 展示，原图 URL 不进入 DOM，防止绕过下载按钮直取原图。
+  // GIF/视频/音频需要原始文件播放或展示动画，仍使用原图直链。
+  const derivativeUrl = (type: string) => {
+    const key = asset.derivatives.find((d) => d.derivativeType === type)?.storageKey;
+    return key ? `/api/v1/storage/derivatives/${key.replace('preview/', '')}` : null;
+  };
   const originalUrl = `/api/v1/storage/originals/${asset.storageKey.replace('original/', '')}`;
+  const isPlayable = asset.mediaType === 'video' || asset.mediaType === 'audio' || asset.mediaType === 'gif';
+  const displayUrl = isPlayable
+    ? originalUrl
+    : derivativeUrl('large') || derivativeUrl('preview') || derivativeUrl('thumb') || originalUrl;
   const currentGroup = asset.groupAssets[0];
   const activeMoveGroupId = moveGroupId || currentGroup?.group.id || groups[0]?.id || '';
 
@@ -424,7 +434,7 @@ export function AssetDetailModal({ assetId, onClose, onPrev, onNext, onChanged, 
             </div>
           ) : (
             <img
-              src={originalUrl}
+              src={displayUrl}
               alt={asset.displayFilename || asset.originalFilename}
               draggable={false}
               onDoubleClick={handleImageDoubleClick}

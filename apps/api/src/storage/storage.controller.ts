@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Res } from '@nestjs/common';
 import { StorageService } from './storage.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { FastifyReply } from 'fastify';
 
 /**
@@ -8,7 +9,10 @@ import { FastifyReply } from 'fastify';
  */
 @Controller('storage')
 export class StorageController {
-  constructor(private storageService: StorageService) {}
+  constructor(
+    private storageService: StorageService,
+    private prisma: PrismaService,
+  ) {}
 
   /**
    * Serve a derivative image (thumbnail, preview, etc.)
@@ -27,8 +31,12 @@ export class StorageController {
   }
 
   /**
-   * Serve an original file for authenticated detail views.
-   * The storage key is only exposed after the asset detail request succeeds.
+   * Serve an original file.
+   *
+   * 原图直链保护: 图片类原图禁止直接访问 (返回 403)，迫使下载只能走
+   * 一次性下载 token (/download/token → /download/temp/:token)。
+   * 详情页改用 large 派生图展示，DOM 中不再出现原图 URL。
+   * GIF / 视频 / 音频仍放行——它们的动画播放依赖原始文件，且不在保护范围内。
    */
   @Get('originals/:year/:month/:day/:filename')
   async serveOriginal(
@@ -39,6 +47,25 @@ export class StorageController {
     @Res() res: FastifyReply,
   ) {
     const storageKey = `original/${year}/${month}/${day}/${filename}`;
+
+    const asset = await this.prisma.mediaAsset.findFirst({
+      where: { storageKey },
+      select: { mediaType: true, status: true },
+    });
+
+    if (!asset || asset.status === 'trashed') {
+      res.code(404).send({ success: false, error: { code: 'NOT_FOUND', message: 'File not found' } });
+      return;
+    }
+
+    if (asset.mediaType === 'image') {
+      res.code(403).send({
+        success: false,
+        error: { code: 'FORBIDDEN', message: '原图禁止直接访问，请通过下载按钮获取' },
+      });
+      return;
+    }
+
     await this.serveFile(storageKey, res);
   }
 

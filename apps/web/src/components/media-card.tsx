@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useCallback, type CSSProperties } from 'react';
-import { cn, formatDuration, copyToClipboard } from '@/lib/utils';
+import { cn, formatDuration, copyToClipboard, apiFetch } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth-store';
 import { showToast } from '@/lib/toast';
 import {
   Download,
@@ -43,7 +44,9 @@ interface MediaCardProps {
 export function MediaCard({ asset, onClick, selected, onSelect, isMultiSelectMode, className, style }: MediaCardProps) {
   const [loaded, setLoaded] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  const token = useAuthStore((s) => s.token);
 
   // Compute aspect ratio for placeholder
   const aspectRatio =
@@ -64,9 +67,23 @@ export function MediaCard({ asset, onClick, selected, onSelect, isMultiSelectMod
 
   const handleDownload = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    // TODO: Generate short-lived download token and download
-    showToast('info', '正在生成下载链接...');
-  }, []);
+    if (!token || downloading) return;
+    setDownloading(true);
+    const result = await apiFetch<{ downloadUrl: string; expiresAt: string }>(
+      '/download/token',
+      token,
+      {
+        method: 'POST',
+        body: JSON.stringify({ assetId: asset.id }),
+      },
+    );
+    if (result.data) {
+      window.open(result.data.downloadUrl, '_blank');
+    } else {
+      showToast('error', result.error || '生成下载链接失败');
+    }
+    setDownloading(false);
+  }, [token, asset.id, downloading]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (isMultiSelectMode && onSelect) {
@@ -194,7 +211,8 @@ export function MediaCard({ asset, onClick, selected, onSelect, isMultiSelectMod
                 </button>
                 <button
                   onClick={handleDownload}
-                  className="rounded-md bg-white/20 p-1.5 text-white hover:bg-white/40 transition-colors active:scale-95"
+                  disabled={downloading}
+                  className="rounded-md bg-white/20 p-1.5 text-white hover:bg-white/40 transition-colors active:scale-95 disabled:opacity-50"
                   aria-label="下载"
                 >
                   <Download className="h-3 w-3" />

@@ -51,7 +51,11 @@ export function TokenEntryPage() {
 
       const { role, tokenPrefix, name } = json.data;
       setAuth(token.trim(), role, tokenPrefix, name);
-      router.push('/gallery');
+
+      // 登录后跳回来源地址 (含 ?asset= 深链)，仅允许站内绝对路径，防开放重定向
+      const redirect = new URLSearchParams(window.location.search).get('redirect');
+      const safeRedirect = redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : null;
+      router.push(safeRedirect || '/gallery');
     } catch {
       setError('网络错误，请稍后重试');
     } finally {
