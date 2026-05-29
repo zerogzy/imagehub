@@ -142,7 +142,7 @@ export function SimilarityReview() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">相似度审核</h1>
           <p className="mt-1 text-sm text-text-secondary">
@@ -152,7 +152,7 @@ export function SimilarityReview() {
         <button
           onClick={handleScan}
           disabled={scanning}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50 sm:w-auto"
         >
           {scanning ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -239,7 +239,7 @@ export function SimilarityReview() {
                 </div>
 
                 {/* Image comparison */}
-                <div className="mb-3 grid grid-cols-2 gap-4">
+                <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="rounded-lg border border-border bg-background-secondary p-2">
                     <p className="mb-1 truncate text-xs text-text-secondary">
                       A: {candidate.assetA?.originalFilename || candidate.assetAId}
@@ -286,7 +286,7 @@ export function SimilarityReview() {
 
                 {/* Actions */}
                 {candidate.status === 'pending' && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => handleResolve(candidate.id, 'kept_both')}
                       className="flex items-center gap-1 rounded-lg bg-success/10 px-3 py-1.5 text-xs font-medium text-success hover:bg-success/20 transition-colors"

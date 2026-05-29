@@ -28,10 +28,10 @@ export function AdminGroupModal({
 }: AdminGroupModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-md animate-scale-in rounded-2xl bg-white p-6 shadow-modal">
+      <div className="w-full max-w-md animate-scale-in rounded-2xl bg-white p-5 shadow-modal sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-text-primary">
             {mode === 'edit' ? '编辑分组' : '新建分组'}

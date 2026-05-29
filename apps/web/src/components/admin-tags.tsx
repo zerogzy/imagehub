@@ -147,7 +147,7 @@ export function AdminTagManager() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">标签管理</h1>
           <p className="mt-1 text-sm text-text-secondary">
@@ -156,7 +156,7 @@ export function AdminTagManager() {
         </div>
         <button
           onClick={() => { setShowCreateModal(true); setFormName(''); setFormAliases(''); }}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover sm:w-auto"
         >
           <Plus className="h-4 w-4" />
           新建标签
@@ -240,10 +240,10 @@ export function AdminTagManager() {
       {/* Create/Edit Modal */}
       {(showCreateModal || editingTag) && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) { setShowCreateModal(false); setEditingTag(null); } }}
         >
-          <div className="w-full max-w-md animate-scale-in rounded-2xl bg-white p-6 shadow-modal">
+          <div className="w-full max-w-md animate-scale-in rounded-2xl bg-white p-5 shadow-modal sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-text-primary">
                 {editingTag ? '编辑标签' : '新建标签'}

@@ -83,74 +83,125 @@ export function AdminShares() {
           <p className="text-sm">暂无永久下载链接</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-border bg-background-secondary text-xs text-text-muted">
-              <tr>
-                <th className="px-4 py-3 font-medium">资源</th>
-                <th className="px-4 py-3 font-medium">链接</th>
-                <th className="px-4 py-3 font-medium">下载次数</th>
-                <th className="px-4 py-3 font-medium">最后下载</th>
-                <th className="px-4 py-3 font-medium">创建时间</th>
-                <th className="px-4 py-3 text-right font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {shares.map((share) => (
-                <tr key={share.id} className="hover:bg-background-secondary/60">
-                  <td className="px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-text-primary">
-                        {share.asset.displayFilename || share.asset.originalFilename}
-                      </p>
-                      <p className="mt-0.5 text-xs text-text-muted">
-                        {share.asset.mediaType} · {formatFileSize(share.asset.sizeBytes)}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <code className="block max-w-[260px] truncate rounded bg-background-secondary px-2 py-1 text-xs text-text-secondary">
-                      {share.downloadUrl}
-                    </code>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1 text-text-primary">
-                      <Download className="h-3.5 w-3.5 text-warning" />
-                      {share.downloadCount.toLocaleString()}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-text-secondary">
-                    {share.lastAccessedAt ? formatDateTime(share.lastAccessedAt) : '未下载'}
-                  </td>
-                  <td className="px-4 py-3 text-text-secondary">{formatDateTime(share.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => handleCopy(share)}
-                        className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-background-secondary hover:text-primary"
-                        aria-label="复制永久链接"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(share)}
-                        disabled={deletingShareId === share.shareId}
-                        className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
-                        aria-label="删除永久链接"
-                      >
-                        {deletingShareId === share.shareId ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* 桌面端：表格 */}
+          <div className="hidden overflow-hidden rounded-xl border border-border bg-white md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-border bg-background-secondary text-xs text-text-muted">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">资源</th>
+                    <th className="px-4 py-3 font-medium">链接</th>
+                    <th className="px-4 py-3 font-medium">下载次数</th>
+                    <th className="px-4 py-3 font-medium">最后下载</th>
+                    <th className="px-4 py-3 font-medium">创建时间</th>
+                    <th className="px-4 py-3 text-right font-medium">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {shares.map((share) => (
+                    <tr key={share.id} className="hover:bg-background-secondary/60">
+                      <td className="px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-text-primary">
+                            {share.asset.displayFilename || share.asset.originalFilename}
+                          </p>
+                          <p className="mt-0.5 text-xs text-text-muted">
+                            {share.asset.mediaType} · {formatFileSize(share.asset.sizeBytes)}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <code className="block max-w-[260px] truncate rounded bg-background-secondary px-2 py-1 text-xs text-text-secondary">
+                          {share.downloadUrl}
+                        </code>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 text-text-primary">
+                          <Download className="h-3.5 w-3.5 text-warning" />
+                          {share.downloadCount.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-text-secondary">
+                        {share.lastAccessedAt ? formatDateTime(share.lastAccessedAt) : '未下载'}
+                      </td>
+                      <td className="px-4 py-3 text-text-secondary">{formatDateTime(share.createdAt)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleCopy(share)}
+                            className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-background-secondary hover:text-primary"
+                            aria-label="复制永久链接"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(share)}
+                            disabled={deletingShareId === share.shareId}
+                            className="rounded-lg border border-border p-2 text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                            aria-label="删除永久链接"
+                          >
+                            {deletingShareId === share.shareId ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 手机端：卡片 */}
+          <div className="space-y-3 md:hidden">
+            {shares.map((share) => (
+              <div key={share.id} className="rounded-xl border border-border bg-white p-3">
+                <p className="break-words font-medium text-text-primary">
+                  {share.asset.displayFilename || share.asset.originalFilename}
+                </p>
+                <p className="mt-0.5 text-xs text-text-muted">
+                  {share.asset.mediaType} · {formatFileSize(share.asset.sizeBytes)}
+                </p>
+                <code className="mt-2 block break-all rounded bg-background-secondary px-2 py-1 text-xs text-text-secondary">
+                  {share.downloadUrl}
+                </code>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary">
+                  <span className="inline-flex items-center gap-1">
+                    <Download className="h-3.5 w-3.5 text-warning" />
+                    下载 {share.downloadCount.toLocaleString()}
+                  </span>
+                  <span>最后下载：{share.lastAccessedAt ? formatDateTime(share.lastAccessedAt) : '未下载'}</span>
+                  <span>创建于：{formatDateTime(share.createdAt)}</span>
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => handleCopy(share)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-background-secondary hover:text-primary"
+                  >
+                    <Copy className="h-4 w-4" />
+                    复制链接
+                  </button>
+                  <button
+                    onClick={() => handleDelete(share)}
+                    disabled={deletingShareId === share.shareId}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                  >
+                    {deletingShareId === share.shareId ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    删除
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

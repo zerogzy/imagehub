@@ -82,7 +82,7 @@ export function AdminBackup() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">备份导出</h1>
           <p className="mt-1 text-sm text-text-secondary">导出元数据备份（不包含原图文件）</p>
@@ -90,7 +90,7 @@ export function AdminBackup() {
         <button
           onClick={handleExport}
           disabled={exporting}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50 sm:w-auto"
         >
           {exporting ? (
             <Loader2 className="h-4 w-4 animate-spin" />

@@ -718,15 +718,15 @@ export function AdminMediaManager() {
 
   return (
     <div className="relative min-h-[70vh]">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between sm:mb-6">
         <div>
           <h1 className="text-xl font-bold text-text-primary">媒体管理</h1>
           <p className="mt-1 text-sm text-text-secondary">共 {total} 个媒体文件</p>
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="relative min-w-64 flex-1 max-w-md">
+      <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="relative w-full min-w-0 flex-1 sm:min-w-64 sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
           <input
             type="text"

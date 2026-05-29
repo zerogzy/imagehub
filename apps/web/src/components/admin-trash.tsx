@@ -141,7 +141,7 @@ export function AdminTrash() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">回收站</h1>
           <p className="mt-1 text-sm text-text-secondary">
@@ -149,7 +149,7 @@ export function AdminTrash() {
           </p>
         </div>
         {selected.size > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-text-muted">已选 {selected.size} 项</span>
             <button
               onClick={handleBatchRestore}

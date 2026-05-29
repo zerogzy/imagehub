@@ -259,7 +259,7 @@ export function AdminGroupManager() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">分组管理</h1>
           <p className="mt-1 text-sm text-text-secondary">
@@ -268,7 +268,7 @@ export function AdminGroupManager() {
         </div>
         <button
           onClick={() => { setShowCreateModal(true); setForm(emptyForm); }}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover sm:w-auto"
         >
           <Plus className="h-4 w-4" />
           新建分组

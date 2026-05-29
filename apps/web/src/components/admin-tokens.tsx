@@ -192,7 +192,7 @@ export function AdminTokenManager() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">密钥管理</h1>
           <p className="mt-1 text-sm text-text-secondary">
@@ -201,7 +201,7 @@ export function AdminTokenManager() {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover sm:w-auto"
         >
           <Plus className="h-4 w-4" />
           创建密钥
@@ -252,9 +252,9 @@ export function AdminTokenManager() {
               t.enabled ? 'border-border' : 'border-danger/30 opacity-60',
             )}
           >
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
               <div className={cn(
-                'rounded-lg p-2.5',
+                'shrink-0 rounded-lg p-2.5 self-start',
                 t.role === 'admin' ? 'bg-warning/10' : 'bg-primary/10',
               )}>
                 <KeyRound className={cn(
@@ -264,7 +264,7 @@ export function AdminTokenManager() {
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-medium text-text-primary">{t.name}</span>
                   <span className={cn(
                     'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
@@ -285,7 +285,7 @@ export function AdminTokenManager() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-text-muted">
+                <p className="mt-1 break-words text-xs text-text-muted">
                   前缀: {t.tokenPrefix} · 创建于 {formatRelativeTime(t.createdAt)}
                   {t.lastUsedAt && ` · 最后使用 ${formatRelativeTime(t.lastUsedAt)}`}
                   {t.rotatedFromTokenId && ' · 已轮转'}
@@ -293,7 +293,7 @@ export function AdminTokenManager() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-1">
+              <div className="flex items-center justify-end gap-1 sm:justify-start">
                 <button
                   onClick={() => handleToggle(t)}
                   disabled={isLastAdmin(t)}
@@ -348,10 +348,10 @@ export function AdminTokenManager() {
       {/* Create Modal */}
       {showCreateModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}
         >
-          <div className="w-full max-w-md animate-scale-in rounded-2xl bg-white p-6 shadow-modal">
+          <div className="w-full max-w-md animate-scale-in rounded-2xl bg-white p-5 shadow-modal sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-text-primary">创建密钥</h2>
               <button

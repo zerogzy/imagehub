@@ -112,7 +112,7 @@ export function AdminStats() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">访问统计</h1>
           <p className="mt-1 text-sm text-text-secondary">查看系统访问和下载数据</p>
@@ -120,7 +120,7 @@ export function AdminStats() {
         <button
           onClick={handleClearStats}
           disabled={clearing}
-          className="flex items-center gap-2 rounded-lg border border-danger/30 px-4 py-2.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-danger/30 px-4 py-2.5 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-50 sm:w-auto"
         >
           {clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
           清零浏览和下载
